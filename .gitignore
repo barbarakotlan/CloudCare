@@ -45,3 +45,9 @@ pgdata/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local working notes
+CLAUDE.md
+claude.md
+.claude/
+

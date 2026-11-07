@@ -9,10 +9,13 @@ type ModalVariant = "center" | "sheet" | "drawer";
 const variantClasses: Record<ModalVariant, string> = {
   // center and sheet share the same desktop width (36rem) so switching between
   // the "Text Foggy" and "Talk to Foggy" dialogs doesn't jump.
-  center: "m-auto w-[calc(100%-2rem)] max-w-xl max-h-[calc(100dvh-2rem)] rounded-[2rem]",
+  // Phones: every variant is a bottom sheet (full width, rounded top, thumb-reachable).
+  center:
+    "mx-0 mb-0 mt-auto w-full max-w-none max-h-[92dvh] rounded-t-[2rem] sm:m-auto sm:w-[calc(100%-2rem)] sm:max-w-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-[2rem]",
   sheet:
     "mx-0 mb-0 mt-auto h-[92dvh] max-h-[92dvh] w-full max-w-none rounded-t-[2rem] sm:m-auto sm:h-[min(760px,calc(100dvh-3rem))] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100%-2rem)] sm:max-w-xl sm:rounded-[2rem]",
-  drawer: "my-0 mr-0 ml-auto h-dvh max-h-dvh w-full max-w-2xl rounded-l-[2rem] max-sm:rounded-none",
+  drawer:
+    "mx-0 mb-0 mt-auto h-[94dvh] max-h-[94dvh] w-full max-w-none rounded-t-[2rem] sm:my-0 sm:mr-0 sm:ml-auto sm:h-dvh sm:max-h-dvh sm:max-w-2xl sm:rounded-l-[2rem] sm:rounded-tr-none",
 };
 
 /**

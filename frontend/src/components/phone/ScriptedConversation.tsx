@@ -125,7 +125,7 @@ export function ScriptedConversation({ className }: { className?: string }) {
         <button
           type="button"
           onClick={() => setPaused((p) => !p)}
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-brand-gray transition-colors hover:bg-surface-pale hover:text-ink"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-brand-gray transition-colors hover:bg-surface-pale hover:text-ink"
         >
           {paused ? <Play className="size-3.5" aria-hidden="true" /> : <Pause className="size-3.5" aria-hidden="true" />}
           {paused ? "Play conversation" : "Pause conversation"}

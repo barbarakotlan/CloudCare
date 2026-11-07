@@ -62,7 +62,7 @@ export function SegmentedControl<T extends string>({
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
               "inline-flex flex-1 items-center justify-center gap-2 rounded-full font-bold transition-[background-color,color,box-shadow] duration-200",
-              size === "md" ? "h-11 px-4 text-[0.95rem]" : "h-8 px-3 text-sm",
+              size === "md" ? "h-11 px-4 text-[0.95rem]" : "h-10 px-3 text-sm sm:h-8",
               selected
                 ? "bg-white text-brand-cyan-strong shadow-[0_2px_8px_-2px_rgb(19_126_160/0.3)]"
                 : "text-ink-soft hover:text-ink",

@@ -37,7 +37,7 @@ export default function LoginPage() {
 
       {/* Form */}
       <main id="main" className="flex flex-col px-4 py-6 sm:px-8 sm:py-10">
-        <Link href="/" className="self-start rounded-xl lg:hidden" aria-label="CloudCare home">
+        <Link href="/" className="inline-flex min-h-11 items-center self-start rounded-xl lg:hidden" aria-label="CloudCare home">
           <BrandLockup size={40} />
         </Link>
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">

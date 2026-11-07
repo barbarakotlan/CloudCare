@@ -184,14 +184,14 @@ export function PatientProfileForm({
           {comorbidities.map((c) => (
             <span
               key={c}
-              className="inline-flex items-center gap-1 rounded-full bg-surface-pale py-1 pr-1 pl-3 text-sm font-bold text-brand-cyan-strong"
+              className="inline-flex items-center gap-0.5 rounded-full bg-surface-pale py-0.5 pr-0.5 pl-3 text-sm font-bold text-brand-cyan-strong"
             >
               {c}
               <button
                 type="button"
                 onClick={() => setComorbidities((list) => list.filter((x) => x !== c))}
                 aria-label={`Remove ${c}`}
-                className="grid size-7 place-items-center rounded-full hover:bg-white"
+                className="grid size-9 place-items-center rounded-full hover:bg-white"
               >
                 <X className="size-3.5" aria-hidden="true" />
               </button>
@@ -208,7 +208,7 @@ export function PatientProfileForm({
             onKeyDown={onDraftKey}
             onBlur={() => commitDraft()}
             placeholder={comorbidities.length ? "Add another" : "None recorded"}
-            className="h-9 min-w-[8rem] flex-1 bg-transparent px-2 text-[0.98rem] text-ink placeholder:text-brand-gray/70 focus:outline-none"
+            className="h-9 min-w-[8rem] flex-1 bg-transparent px-2 text-base sm:text-[0.98rem] text-ink placeholder:text-brand-gray/70 focus:outline-none"
           />
         </div>
       </Field>

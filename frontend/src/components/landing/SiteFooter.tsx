@@ -23,7 +23,10 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-col gap-5 md:items-end">
-          <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold text-brand-cyan-strong">
+          <nav
+            aria-label="Footer"
+            className="-my-2 flex flex-wrap gap-x-5 text-sm font-bold text-brand-cyan-strong [&>a]:inline-flex [&>a]:min-h-10 [&>a]:items-center"
+          >
             <Link href="/#how-it-works" className="hover:underline">
               How it works
             </Link>

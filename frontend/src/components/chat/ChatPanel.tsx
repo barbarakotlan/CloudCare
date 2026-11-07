@@ -105,7 +105,7 @@ export function ChatPanel({
                 type="button"
                 disabled={pending}
                 onClick={() => void send(s)}
-                className="shrink-0 rounded-full bg-surface-pale px-3 py-1.5 text-sm font-semibold text-brand-cyan-strong transition-colors hover:bg-[#d3edf4] disabled:opacity-50"
+                className="min-h-10 shrink-0 rounded-full bg-surface-pale px-3 py-1.5 text-sm sm:min-h-0 font-semibold text-brand-cyan-strong transition-colors hover:bg-[#d3edf4] disabled:opacity-50"
               >
                 {s}
               </button>
@@ -130,7 +130,7 @@ export function ChatPanel({
             onKeyDown={onKeyDown}
             placeholder="Text Foggy…"
             maxLength={2000}
-            className="max-h-32 min-h-12 flex-1 resize-none rounded-3xl border border-line bg-surface-soft px-4 py-3 text-[0.98rem] leading-snug text-ink placeholder:text-brand-gray/80 focus:border-brand-cyan focus:bg-white focus:outline-none"
+            className="max-h-32 min-h-12 flex-1 resize-none rounded-3xl border border-line bg-surface-soft px-4 py-3 text-base leading-snug sm:text-[0.98rem] text-ink placeholder:text-brand-gray/80 focus:border-brand-cyan focus:bg-white focus:outline-none"
           />
           <button
             type="submit"

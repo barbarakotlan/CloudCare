@@ -74,7 +74,7 @@ export function ToastViewport({ toasts, onDismiss }: { toasts: ToastItem[]; onDi
             type="button"
             onClick={() => onDismiss(t.id)}
             aria-label="Dismiss notification"
-            className="grid size-8 place-items-center rounded-full text-brand-gray hover:bg-surface-pale"
+            className="-my-1 -mr-1 grid size-10 shrink-0 place-items-center rounded-full text-brand-gray hover:bg-surface-pale"
           >
             <X className="size-4" aria-hidden="true" />
           </button>

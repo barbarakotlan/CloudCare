@@ -107,7 +107,7 @@ export function CarePlanUpload({
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           placeholder={"Wound care:\nKeep the incision clean and dry…\n\nWhen to call:\nCall your surgeon if…"}
-          className="font-mono text-sm"
+          className="font-mono sm:text-sm"
           required
         />
       </Field>

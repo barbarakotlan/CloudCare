@@ -193,16 +193,20 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
                     {formatClock(dose.time)}
                     {due ? <span className="font-bold text-[#7d5600]"> · due now</span> : null}
                     {answered ? <span className="font-semibold"> · {dose.status}</span> : null}
+                    {taken ? <span className="font-semibold text-[#146b49] sm:hidden"> · taken</span> : null}
                   </p>
                 </div>
                 {taken ? (
                   <div className="flex shrink-0 items-center gap-1">
-                    <Badge tone="green">Taken</Badge>
+                    {/* Phones: the check and "· taken" carry it, leaving room for the medicine name. */}
+                    <Badge tone="green" className="max-sm:hidden">
+                      Taken
+                    </Badge>
                     {canUndo ? (
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="px-3"
+                        className="px-2.5 sm:px-3"
                         disabled={busy}
                         onClick={() => void answer(dose, "pending")}
                         aria-label={`Undo: ${label} not taken yet`}

@@ -6,7 +6,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-transparent bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70">
       <nav aria-label="Main" className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:h-[4.5rem] sm:px-6">
-        <Link href="/" className="rounded-xl" aria-label="CloudCare home">
+        <Link href="/" className="inline-flex min-h-11 items-center rounded-xl" aria-label="CloudCare home">
           <BrandLockup size={44} />
         </Link>
         <div className="flex items-center gap-1 sm:gap-2">
@@ -22,7 +22,7 @@ export function SiteHeader() {
           >
             Our promise
           </Link>
-          <ButtonLink href="/login" variant="secondary" size="sm" className="h-10 px-5">
+          <ButtonLink href="/login" variant="secondary" size="sm" className="px-5 sm:h-10">
             Log in
           </ButtonLink>
         </div>

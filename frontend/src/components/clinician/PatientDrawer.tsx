@@ -262,7 +262,7 @@ function DrawerBody({
                   <ul className="mt-3 flex flex-col gap-2">
                     {row.latest_risk.top_factors.map((f) => (
                       <li key={f.feature} className="flex items-center gap-3 text-sm">
-                        <span className="w-40 shrink-0 font-semibold text-ink">{factorLabel(f.feature)}</span>
+                        <span className="w-32 shrink-0 font-semibold text-ink sm:w-40">{factorLabel(f.feature)}</span>
                         <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
                           <span
                             className="block h-full rounded-full bg-brand-cyan"

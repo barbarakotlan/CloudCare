@@ -19,7 +19,8 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-9 px-4 text-sm",
+  // 40 px tall on phones (touch target), 36 px from sm up.
+  sm: "h-10 px-4 text-sm sm:h-9",
   md: "h-11 px-5 text-[0.95rem]",
   lg: "h-14 px-7 text-[1.05rem]",
 };

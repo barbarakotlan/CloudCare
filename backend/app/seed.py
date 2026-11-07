@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import SUPABASE_URL, hash_password
+from app.demo_data import seed_demo_cohort
 from app.models import Appointment, CarePlan, CarePlanChunk, Medication, Patient, User
 from app.routes.patients import split_into_chunks
 
@@ -191,6 +192,7 @@ def seed_demo_users(db: Session) -> None:
         db.add(plan)
 
     _seed_reminders(db, patient)
+    seed_demo_cohort(db, clinician, patient)
     db.commit()
 
 

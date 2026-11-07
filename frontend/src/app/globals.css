@@ -1,26 +1,158 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+   CloudCare brand tokens (source: frontend/public/brand/ logos)
+   ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand-red: #dc3849;
+  --brand-red-dark: #c2303f;
+  --brand-cyan: #199ac0;
+  /* Deeper cyan for small text on white (AA contrast) and hover states. */
+  --brand-cyan-strong: #137ea0;
+  --brand-white: #ffffff;
+  --brand-gray: #636363;
+  --surface-pale: #e5f4f8;
+  --surface-soft: #f3fafc;
+  --line: #d5e7ee;
+  --ink: #1c2630;
+  --ink-soft: #3d4a56;
+
+  /* Severity scale (clinician queue) */
+  --sev-emergency: #dc3849;
+  --sev-high: #e5701c;
+  --sev-medium: #c98a04;
+  --sev-low: #7a8590;
+  --ok: #1f9d6b;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-brand-red: var(--brand-red);
+  --color-brand-red-dark: var(--brand-red-dark);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-cyan-strong: var(--brand-cyan-strong);
+  --color-brand-white: var(--brand-white);
+  --color-brand-gray: var(--brand-gray);
+  --color-surface-pale: var(--surface-pale);
+  --color-surface-soft: var(--surface-soft);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-sev-emergency: var(--sev-emergency);
+  --color-sev-high: var(--sev-high);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-low: var(--sev-low);
+  --color-ok: var(--ok);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --font-sans: var(--font-nunito), ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+
+  --radius-cloud: 2rem;
+
+  --shadow-soft: 0 1px 2px rgb(28 38 48 / 0.04), 0 8px 24px -8px rgb(25 154 192 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(28 38 48 / 0.05), 0 24px 48px -16px rgb(25 154 192 / 0.28);
+  --shadow-phone: 0 40px 80px -24px rgb(19 126 160 / 0.35), 0 12px 24px -12px rgb(28 38 48 / 0.25);
+
+  --animate-bubble-in: bubble-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-typing: typing 1.2s ease-in-out infinite;
+  --animate-drift: drift 14s ease-in-out infinite alternate;
+  --animate-pulse-ring: pulse-ring 1.6s ease-out infinite;
+  --animate-flash: flash 1.6s ease-out 1;
+
+  @keyframes bubble-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes typing {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.45;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+  @keyframes drift {
+    from {
+      transform: translateX(-12px) translateY(0);
+    }
+    to {
+      transform: translateX(12px) translateY(-6px);
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgb(25 154 192 / 0.45);
+    }
+    100% {
+      box-shadow: 0 0 0 18px rgb(25 154 192 / 0);
+    }
+  }
+  @keyframes flash {
+    0% {
+      box-shadow: 0 0 0 0 rgb(220 56 73 / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 14px rgb(220 56 73 / 0);
+    }
   }
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--brand-white);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--surface-pale);
+  color: var(--ink);
+}
+
+/* Visible, on-brand focus ring for keyboard users only. */
+:focus-visible {
+  outline: 3px solid var(--brand-cyan);
+  outline-offset: 2px;
+}
+
+/* Native <dialog> used for modals and drawers. */
+dialog::backdrop {
+  background: rgb(28 38 48 / 0.45);
+  backdrop-filter: blur(3px);
+}
+dialog {
+  color: var(--ink);
+}
+html[data-modal-open="true"] {
+  overflow: hidden;
+}
+
+input[type="range"].cc-range {
+  accent-color: var(--brand-cyan);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

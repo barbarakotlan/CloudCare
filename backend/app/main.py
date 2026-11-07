@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app import models  # noqa: F401  (registers all tables on Base)
 from app.database import Base, SessionLocal, engine, get_db
-from app.routes import auth, chat, escalations, patients, symptoms
+from app.routes import auth, chat, escalations, patients, recovery, symptoms
 from app.seed import seed_demo_users
 
 
@@ -46,6 +46,7 @@ app.include_router(patients.router)
 app.include_router(symptoms.router)
 app.include_router(chat.router)
 app.include_router(escalations.router)
+app.include_router(recovery.router)
 
 
 @app.get("/")

@@ -8,14 +8,14 @@ rows reuse the Supabase user ids, so either sign-in method lands on the same dat
 import logging
 import os
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import SUPABASE_URL, hash_password
-from app.models import CarePlan, CarePlanChunk, Patient, User
+from app.models import Appointment, CarePlan, CarePlanChunk, Medication, Patient, User
 from app.routes.patients import split_into_chunks
 
 log = logging.getLogger("cloudcare.seed")
@@ -190,4 +190,41 @@ def seed_demo_users(db: Session) -> None:
             plan.chunks.append(CarePlanChunk(patient_id=patient.id, chunk_index=i, section=section, content=content))
         db.add(plan)
 
+    _seed_reminders(db, patient)
     db.commit()
+
+
+def _seed_reminders(db: Session, patient: Patient) -> None:
+    """Medications and appointments matching the demo care plan.
+
+    Checked separately from the patient so databases created before reminders existed get them too.
+    """
+    has_meds = db.scalar(select(Medication.id).where(Medication.patient_id == patient.id).limit(1))
+    if has_meds is None:
+        start = patient.surgery_date
+        db.add_all([
+            Medication(patient_id=patient.id, name="Acetaminophen", dosage="1000 mg",
+                       instructions="Every 8 hours.", times_of_day=["06:00", "14:00", "22:00"], start_date=start),
+            Medication(patient_id=patient.id, name="Aspirin", dosage="81 mg",
+                       instructions="Twice daily for 4 weeks to prevent blood clots.",
+                       times_of_day=["08:00", "20:00"], start_date=start, end_date=start + timedelta(weeks=4)),
+            Medication(patient_id=patient.id, name="Oxycodone", dosage="5 mg",
+                       instructions="Only as needed for severe pain. No driving while taking it.",
+                       times_of_day=[], start_date=start),
+        ])
+
+    has_appts = db.scalar(select(Appointment.id).where(Appointment.patient_id == patient.id).limit(1))
+    if has_appts is None:
+        # Times in UTC: 15:30 / 14:00 UTC is 10:30 / 9:00 AM US Eastern.
+        tomorrow = date.today() + timedelta(days=1)
+        follow_up = patient.surgery_date + timedelta(days=14)
+        db.add_all([
+            Appointment(patient_id=patient.id, title="Physical therapy", provider_name="Sam Rivera, PT",
+                        location="Outpatient Rehab, Building B",
+                        scheduled_at=datetime.combine(tomorrow, time(15, 30), tzinfo=timezone.utc),
+                        notes="Bring your walker and wear loose shorts."),
+            Appointment(patient_id=patient.id, title="Post-op follow-up", provider_name="Dr. Priya Patel",
+                        location="Orthopedic Clinic, 3rd floor",
+                        scheduled_at=datetime.combine(follow_up, time(14, 0), tzinfo=timezone.utc),
+                        notes="Incision check and staple removal."),
+        ])

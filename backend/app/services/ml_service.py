@@ -14,7 +14,12 @@ HIGH_AT = 0.6
 
 
 def score_risk(symptoms: dict, patient: dict) -> dict:
-    """
+    return score_risk_rules(symptoms, patient)
+
+
+def score_risk_rules(symptoms: dict, patient: dict) -> dict:
+    """Hand-written rules. Also used as the baseline that ml/train.py compares against.
+
     Inputs:
       symptoms: one check-in, same keys as the symptom_logs table:
                 pain_level, temperature_f, wound_redness, wound_drainage, swelling,

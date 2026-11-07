@@ -4,10 +4,13 @@ import { ChevronRight, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import type { PatientRow } from "@/lib/api/types";
+import { PENDING_SETUP_PROCEDURE, type PatientRow } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { daysSince, relativeTime, RISK_LABEL } from "@/lib/format";
+import { FinishSetupBadge } from "./PatientDrawer";
 import { RISK_TONE } from "./severity";
+
+const needsSetup = (r: PatientRow) => r.procedure_name === PENDING_SETUP_PROCEDURE;
 
 function RiskCell({ row }: { row: PatientRow }) {
   if (!row.latest_risk) return <Badge tone="gray">No check-ins</Badge>;
@@ -76,11 +79,16 @@ export function PatientTable({
                   className="flex w-full items-center gap-3 rounded-2xl bg-surface-soft p-4 text-left ring-1 ring-line/60 transition-colors hover:bg-surface-pale"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-extrabold text-ink">{r.full_name}</p>
-                    <p className="truncate text-sm text-brand-gray">
-                      {r.procedure_name}
-                      {now !== null ? ` · day ${daysSince(r.surgery_date, now)}` : ""}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-extrabold text-ink">
+                      <span className="min-w-0 break-words">{r.full_name}</span>
+                      {needsSetup(r) ? <FinishSetupBadge /> : null}
                     </p>
+                    {needsSetup(r) ? null : (
+                      <p className="truncate text-sm text-brand-gray">
+                        {r.procedure_name}
+                        {now !== null ? ` · day ${daysSince(r.surgery_date, now)}` : ""}
+                      </p>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <RiskCell row={r} />
                     </div>
@@ -110,11 +118,18 @@ export function PatientTable({
                 {rows.map((r) => (
                   <tr key={r.id} className="group">
                     <td className="rounded-l-2xl bg-surface-soft px-3 py-3 group-hover:bg-surface-pale">
-                      <p className="font-extrabold whitespace-nowrap text-ink">{r.full_name}</p>
-                      <p className="max-w-[13rem] truncate text-sm text-brand-gray" title={r.procedure_name}>
-                        {now !== null ? `Day ${daysSince(r.surgery_date, now)} · ` : ""}
-                        {r.procedure_name}
+                      <p className="flex items-center gap-2 font-extrabold whitespace-nowrap text-ink">
+                        {r.full_name}
+                        {needsSetup(r) ? <FinishSetupBadge /> : null}
                       </p>
+                      {needsSetup(r) ? (
+                        <p className="text-sm text-brand-gray">Add procedure and dates</p>
+                      ) : (
+                        <p className="max-w-[13rem] truncate text-sm text-brand-gray" title={r.procedure_name}>
+                          {now !== null ? `Day ${daysSince(r.surgery_date, now)} · ` : ""}
+                          {r.procedure_name}
+                        </p>
+                      )}
                     </td>
                     <td className="bg-surface-soft px-3 py-3 whitespace-nowrap group-hover:bg-surface-pale">
                       <RiskCell row={r} />

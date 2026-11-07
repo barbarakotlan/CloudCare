@@ -7,7 +7,7 @@ import { ToastViewport, useToasts } from "@/components/ui/Toast";
 import { errorMessage } from "@/lib/api/client";
 import { listEscalations, updateEscalation } from "@/lib/api/escalations";
 import { listPatients } from "@/lib/api/patients";
-import type { EscalationOut, EscalationStatus, PatientRow } from "@/lib/api/types";
+import type { EscalationOut, EscalationStatus, PatientOut, PatientRow } from "@/lib/api/types";
 import type { Session } from "@/lib/auth";
 import { RequireRole } from "@/lib/auth/RequireRole";
 import { cn } from "@/lib/cn";
@@ -133,6 +133,16 @@ export function ClinicianDashboard({ session }: { session: Session }) {
     }
   }
 
+  function onProfileSaved(saved: PatientOut) {
+    setPatients((rows) =>
+      rows?.map((r) =>
+        r.id === saved.id ? { ...r, procedure_name: saved.procedure_name, surgery_date: saved.surgery_date } : r,
+      ),
+    );
+    push({ tone: "success", title: "Profile saved", body: saved.full_name });
+    void refresh(new AbortController().signal);
+  }
+
   const emergencies = active.filter((e) => e.severity === "emergency").length;
   const highRisk = (patients ?? []).filter((p) => p.latest_risk?.risk_level === "high").length;
   const selectedRow = patients?.find((p) => p.id === selectedId);
@@ -189,6 +199,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
         escalations={active}
         now={now}
         onClose={() => setSelectedId(null)}
+        onProfileSaved={onProfileSaved}
       />
       <ToastViewport toasts={toasts} onDismiss={dismiss} />
     </>

@@ -42,7 +42,22 @@ export type PatientOut = {
   comorbidities: string[];
 };
 
-export type CarePlanChunk = { id: string; chunk_index: number; section: string | null; content: string };
+export type ProcedureType = "orthopedic" | "abdominal" | "cardiac" | "spine" | "other";
+
+/** Clinician edit of a patient profile; only the fields sent change. Dates are YYYY-MM-DD. */
+export type PatientUpdate = {
+  procedure_name?: string;
+  procedure_type?: ProcedureType | string;
+  surgery_date?: string;
+  discharge_date?: string | null;
+  date_of_birth?: string | null;
+  comorbidities?: string[];
+};
+
+/** Placeholder procedure the backend gives a patient who signed up before their care team set them up. */
+export const PENDING_SETUP_PROCEDURE = "Pending clinician setup";
+
+export type CarePlanChunk ={ id: string; chunk_index: number; section: string | null; content: string };
 
 export type CarePlanOut = {
   id: string;

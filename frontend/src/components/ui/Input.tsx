@@ -8,6 +8,10 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(field, "h-12", className)} {...props} />;
 }
 
+export function Select({ className, ...props }: ComponentProps<"select">) {
+  return <select className={cn(field, "h-12 pr-10", className)} {...props} />;
+}
+
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return <textarea className={cn(field, "py-3 leading-relaxed", className)} {...props} />;
 }

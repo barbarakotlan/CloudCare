@@ -9,7 +9,18 @@ import { uploadCarePlan } from "@/lib/api/patients";
 import type { CarePlanOut } from "@/lib/api/types";
 import { DEMO_CARE_PLAN_TEXT, DEMO_CARE_PLAN_TITLE, splitIntoChunks } from "@/lib/demo/demoCarePlan";
 
-export function CarePlanUpload({ patientId, patientName }: { patientId: string; patientName: string }) {
+export function CarePlanUpload({
+  patientId,
+  patientName,
+  hasPlan = false,
+  onSaved,
+}: {
+  patientId: string;
+  patientName: string;
+  /** A plan is already active: word the form as replacing it. */
+  hasPlan?: boolean;
+  onSaved?: (plan: CarePlanOut) => void;
+}) {
   const [title, setTitle] = useState("");
   const [raw, setRaw] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -26,6 +37,7 @@ export function CarePlanUpload({ patientId, patientName }: { patientId: string; 
     try {
       const plan = await uploadCarePlan(patientId, { title: title.trim() || "Care plan", raw_text: raw });
       setSaved(plan);
+      onSaved?.(plan);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -61,7 +73,7 @@ export function CarePlanUpload({ patientId, patientName }: { patientId: string; 
             setRaw("");
           }}
         >
-          Upload another version
+          Replace plan again
         </Button>
       </div>
     );
@@ -70,8 +82,11 @@ export function CarePlanUpload({ patientId, patientName }: { patientId: string; 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <p className="rounded-2xl bg-surface-soft px-4 py-3 text-sm text-ink-soft">
-        Uploading replaces {patientName}&rsquo;s active plan. Separate sections with a blank line; a short first line
-        ending in &ldquo;:&rdquo; becomes the section name Foggy cites.
+        {hasPlan
+          ? `Saving replaces ${patientName}’s current plan above.`
+          : `${patientName} has no care plan yet. Foggy answers from the one you save here.`}{" "}
+        Separate sections with a blank line; a short first line ending in &ldquo;:&rdquo; becomes the section name
+        Foggy cites.
       </p>
       <Field label="Plan title" htmlFor={`${ids}-title`}>
         <Input
@@ -101,10 +116,10 @@ export function CarePlanUpload({ patientId, patientName }: { patientId: string; 
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button type="submit" disabled={!raw.trim() || submitting}>
           {submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Upload className="size-4" aria-hidden="true" />}
-          Save care plan
+          {hasPlan ? "Replace plan" : "Save care plan"}
         </Button>
         <Button
           variant="ghost"

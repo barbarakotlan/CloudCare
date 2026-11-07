@@ -69,6 +69,14 @@ export const FACTOR_LABEL: Record<string, string> = {
   comorbidities: "Health history",
   days_since_surgery: "Days since surgery",
   age: "Age",
+  has_diabetes: "Diabetes",
+  is_smoker: "Smoker",
+  has_obesity: "Obesity",
+  procedure_type: "Type of surgery",
+  procedure_orthopedic: "Orthopedic surgery",
+  procedure_abdominal: "Abdominal surgery",
+  procedure_cardiac: "Heart surgery",
+  procedure_general: "General surgery",
 };
 
 export function factorLabel(feature: string) {

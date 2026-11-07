@@ -1,6 +1,15 @@
 "use client";
 
-import { Activity, CircleHelp, ClipboardList, MessagesSquare, Thermometer } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  ChevronDown,
+  CircleHelp,
+  ClipboardList,
+  MessagesSquare,
+  Thermometer,
+  UserRoundPen,
+} from "lucide-react";
 import { useState } from "react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { fromApiMessage } from "@/components/chat/types";
@@ -9,9 +18,18 @@ import { Modal } from "@/components/ui/Modal";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SkeletonLines } from "@/components/ui/Skeleton";
 import { getChatHistory } from "@/lib/api/chat";
-import { getPatient } from "@/lib/api/patients";
+import { ApiError } from "@/lib/api/client";
+import { getPatient, getPatientCarePlan } from "@/lib/api/patients";
 import { getSymptoms } from "@/lib/api/symptoms";
-import type { ChatMessageOut, EscalationOut, PatientRow, SymptomOut } from "@/lib/api/types";
+import {
+  PENDING_SETUP_PROCEDURE,
+  type CarePlanOut,
+  type ChatMessageOut,
+  type EscalationOut,
+  type PatientOut,
+  type PatientRow,
+  type SymptomOut,
+} from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import {
   daysSince,
@@ -26,9 +44,12 @@ import {
 } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
 import { CarePlanUpload } from "./CarePlanUpload";
+import { PatientProfileForm } from "./PatientProfileForm";
 import { RISK_TONE, SEVERITY_TONE, STATUS_LABEL } from "./severity";
 
-type Tab = "overview" | "checkins" | "chat" | "plan";
+type Tab = "overview" | "checkins" | "chat" | "plan" | "profile";
+
+type PlanState = { kind: "ok"; plan: CarePlanOut | null } | { kind: "unavailable" };
 
 export function PatientDrawer({
   patientId,
@@ -36,26 +57,77 @@ export function PatientDrawer({
   escalations,
   now,
   onClose,
+  onProfileSaved,
 }: {
   patientId: string | null;
   row: PatientRow | undefined;
   escalations: EscalationOut[];
   now: number | null;
   onClose: () => void;
+  onProfileSaved: (patient: PatientOut) => void;
 }) {
+  const pending = row?.procedure_name === PENDING_SETUP_PROCEDURE;
   return (
     <Modal
       open={patientId !== null}
       onClose={onClose}
       variant="drawer"
       title={row?.full_name ?? "Patient"}
-      description={row ? row.procedure_name : undefined}
+      description={row && !pending ? row.procedure_name : undefined}
+      headerExtra={pending ? <FinishSetupBadge className="mt-1.5" /> : null}
       bodyClassName="bg-surface-soft"
     >
       {patientId ? (
-        <DrawerBody key={patientId} patientId={patientId} row={row} escalations={escalations} now={now} />
+        <DrawerBody
+          key={patientId}
+          patientId={patientId}
+          row={row}
+          escalations={escalations}
+          now={now}
+          onProfileSaved={onProfileSaved}
+        />
       ) : null}
     </Modal>
+  );
+}
+
+/** Patients who signed up before their care team added a procedure. */
+export function FinishSetupBadge({ className }: { className?: string }) {
+  return (
+    <Badge tone="amber" dot className={className}>
+      Finish setup
+    </Badge>
+  );
+}
+
+function CurrentPlan({ plan }: { plan: CarePlanOut }) {
+  const sections = [...plan.chunks].sort((a, b) => a.chunk_index - b.chunk_index);
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="font-extrabold break-words text-ink">{plan.title}</p>
+        <p className="text-xs text-brand-gray">
+          Saved {formatDate(plan.created_at, { month: "short", day: "numeric", year: "numeric" })} · {sections.length}{" "}
+          section{sections.length === 1 ? "" : "s"}
+        </p>
+      </div>
+      <ul className="mt-3 flex flex-col gap-2">
+        {sections.map((c) => (
+          <li key={c.id}>
+            <details className="group rounded-2xl bg-surface-soft ring-1 ring-line/60">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-bold text-ink [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 break-words">{c.section ?? `Part ${c.chunk_index + 1}`}</span>
+                <ChevronDown
+                  className="size-4 shrink-0 text-brand-gray transition-transform group-open:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <p className="px-4 pb-3 text-sm leading-relaxed break-words whitespace-pre-line text-ink-soft">{c.content}</p>
+            </details>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -75,34 +147,53 @@ function DrawerBody({
   row,
   escalations,
   now,
+  onProfileSaved,
 }: {
   patientId: string;
   row: PatientRow | undefined;
   escalations: EscalationOut[];
   now: number | null;
+  onProfileSaved: (patient: PatientOut) => void;
 }) {
-  const [tab, setTab] = useState<Tab>("overview");
+  // New sign-ups land on the profile form first.
+  const [tab, setTab] = useState<Tab>(row?.procedure_name === PENDING_SETUP_PROCEDURE ? "profile" : "overview");
   const profile = useAsync(`patient:${patientId}`, (s) => getPatient(patientId, s));
+  const plan = useAsync<PlanState>(`patient-plan:${patientId}`, async (s) => {
+    try {
+      return { kind: "ok", plan: await getPatientCarePlan(patientId, s) };
+    } catch (err) {
+      // Older API: clinicians can upload a plan but not read it back yet.
+      if (err instanceof ApiError && (err.status === 404 || err.status === 405)) return { kind: "unavailable" };
+      throw err;
+    }
+  });
   const symptoms = useAsync(`symptoms:${patientId}`, (s) => getSymptoms(patientId, s));
   const chat = useAsync(`chat:${patientId}`, (s) => getChatHistory(patientId, s));
   const unanswered = chat.data ? unansweredQuestions(chat.data) : [];
   const open = escalations.filter((e) => e.patient_id === patientId && e.status !== "resolved");
   const name = row?.full_name ?? profile.data?.full_name ?? "this patient";
+  // Unknown (older API) counts as having one: "replace" is the safe wording.
+  const hasPlan = plan.data?.kind === "unavailable" || Boolean(plan.data?.kind === "ok" && plan.data.plan);
 
   return (
     <div className="flex flex-col gap-5 p-4 sm:p-6">
-      <SegmentedControl<Tab>
-        label="Patient details"
-        size="sm"
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: "overview", label: "Overview" },
-          { value: "checkins", label: "Check-ins" },
-          { value: "chat", label: "Chat" },
-          { value: "plan", label: "Care plan" },
-        ]}
-      />
+      {/* Five tabs don't fit a phone: let the row scroll sideways inside the drawer. */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <SegmentedControl<Tab>
+          label="Patient details"
+          size="sm"
+          value={tab}
+          onChange={setTab}
+          className="min-w-max sm:min-w-0"
+          options={[
+            { value: "overview", label: "Overview" },
+            { value: "checkins", label: "Check-ins" },
+            { value: "chat", label: "Chat" },
+            { value: "plan", label: "Care plan" },
+            { value: "profile", label: "Profile" },
+          ]}
+        />
+      </div>
 
       {tab === "overview" ? (
         <>
@@ -267,12 +358,58 @@ function DrawerBody({
       ) : null}
 
       {tab === "plan" ? (
-        <section aria-labelledby="plan-upload-title" className="rounded-3xl bg-white p-5 ring-1 ring-line/70">
-          <h3 id="plan-upload-title" className="mb-3 flex items-center gap-2 font-extrabold text-ink">
-            <ClipboardList className="size-4 text-brand-cyan-strong" aria-hidden="true" />
-            Upload a new care plan
+        <>
+          <section aria-labelledby="plan-current-title" className="rounded-3xl bg-white p-5 ring-1 ring-line/70">
+            <h3 id="plan-current-title" className="mb-3 flex items-center gap-2 font-extrabold text-ink">
+              <BookOpen className="size-4 text-brand-cyan-strong" aria-hidden="true" />
+              Current care plan
+            </h3>
+            {plan.loading && !plan.data ? <SkeletonLines lines={3} /> : null}
+            {plan.error ? <p role="alert" className="text-sm text-brand-red-dark">{plan.error}</p> : null}
+            {plan.data?.kind === "unavailable" ? (
+              <p className="text-sm text-brand-gray">
+                Viewing the current plan isn&rsquo;t available on this server yet. You can still replace it below.
+              </p>
+            ) : null}
+            {plan.data?.kind === "ok" && plan.data.plan === null ? (
+              <p className="text-sm text-brand-gray">No care plan yet. Foggy can&rsquo;t answer {name}&rsquo;s questions until you add one.</p>
+            ) : null}
+            {plan.data?.kind === "ok" && plan.data.plan ? <CurrentPlan plan={plan.data.plan} /> : null}
+          </section>
+
+          <section aria-labelledby="plan-upload-title" className="rounded-3xl bg-white p-5 ring-1 ring-line/70">
+            <h3 id="plan-upload-title" className="mb-3 flex items-center gap-2 font-extrabold text-ink">
+              <ClipboardList className="size-4 text-brand-cyan-strong" aria-hidden="true" />
+              {hasPlan ? "Replace plan" : "Add a care plan"}
+            </h3>
+            <CarePlanUpload
+              patientId={patientId}
+              patientName={name}
+              hasPlan={hasPlan}
+              onSaved={(saved) => plan.setData(() => ({ kind: "ok", plan: saved }))}
+            />
+          </section>
+        </>
+      ) : null}
+
+      {tab === "profile" ? (
+        <section aria-labelledby="profile-edit-title" className="rounded-3xl bg-white p-5 ring-1 ring-line/70">
+          <h3 id="profile-edit-title" className="mb-3 flex items-center gap-2 font-extrabold text-ink">
+            <UserRoundPen className="size-4 text-brand-cyan-strong" aria-hidden="true" />
+            Edit profile
           </h3>
-          <CarePlanUpload patientId={patientId} patientName={name} />
+          {profile.loading && !profile.data ? <SkeletonLines lines={4} /> : null}
+          {profile.error ? <p role="alert" className="text-sm text-brand-red-dark">{profile.error}</p> : null}
+          {profile.data ? (
+            <PatientProfileForm
+              key={JSON.stringify(profile.data)}
+              patient={profile.data}
+              onSaved={(saved) => {
+                profile.setData(() => saved);
+                onProfileSaved(saved);
+              }}
+            />
+          ) : null}
         </section>
       ) : null}
     </div>

@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CloudCare frontend
 
-## Getting Started
+Next.js 16 (App Router, Turbopack, Cache Components) + React 19 + Tailwind CSS v4.
+Landing page, login, patient dashboard, clinician dashboard, Foggy chat and voice.
 
-First, run the development server:
+> Your head's in the clouds. Your care shouldn't be.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Run it
+
+```powershell
+# from frontend/ (Windows PowerShell: put Node on PATH first)
+$env:PATH = "C:\Program Files\nodejs;$env:PATH"
+npm install
+Copy-Item .env.local.example .env.local   # then edit if needed
+npm run dev        # http://localhost:3000
+npm run build      # production build (must pass)
+npm run lint       # eslint 9 flat config
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The backend must be running for login and the dashboards (from the repo root):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir backend   # http://localhost:8000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Demo accounts (seeded by the backend, password `demo123`):
 
-## Learn More
+| Role | Email |
+|---|---|
+| Patient (Jordan Lee) | `patient@demo.com` |
+| Doctor (Dr. Priya Patel) | `clinician@demo.com` |
 
-To learn more about Next.js, take a look at the following resources:
+The landing page demo chat ("Try texting Foggy") works without the backend: it answers locally from the sample care plan in `src/lib/demo/`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+All live in `frontend/.env.local` (template: `.env.local.example`).
 
-## Deploy on Vercel
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI base URL. The backend's CORS allows `http://localhost:3000` only. |
+| `NEXT_PUBLIC_AUTH_PROVIDER` | `backend` | `backend` = FastAPI `POST /auth/login` (JWT). `supabase` = Supabase email/password (dormant until a project exists; the backend does not accept Supabase tokens yet). |
+| `NEXT_PUBLIC_SUPABASE_URL` | empty | Supabase project URL (only for the supabase provider). |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | empty | Supabase anon key (only for the supabase provider). |
+| `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` | empty | ElevenLabs Conversational AI agent for "Talk to Foggy". Empty shows a friendly "not configured yet" state. |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Routes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Route | What |
+|---|---|
+| `/` | Landing: scripted Foggy conversation on a phone, "Try texting Foggy" (local demo chat), "Talk to Foggy" (voice). |
+| `/login` | Doctor / Patient toggle, demo credentials prefilled, redirects by role. |
+| `/patient/dashboard` | Day N of recovery, care plan, reminders (mock), symptom check-in, Foggy chat, voice. |
+| `/clinician/dashboard` | Escalation queue (polls every 5 s), patients by risk, patient drawer (check-ins, transcript, care plan upload). |
+
+## Layout
+
+```
+src/
+  app/                 routes, layout, globals.css (brand tokens in @theme inline)
+  components/
+    brand/             Wordmark (live text), CloudMark, Swoosh, CloudShape
+    ui/                Button, Card, Badge, Input, SegmentedControl, Skeleton, Toast, Modal
+    chat/              ChatPanel, MessageBubble, TypingIndicator, useChat
+    phone/             IPhoneFrame, ScriptedConversation
+    voice/             TalkToFoggy (ElevenLabs, lazy-loaded)
+    landing/ patient/ clinician/ app/
+  lib/
+    api/               client.ts (bearer token, JSON errors), types.ts, one file per resource
+                       reminders.ts is MOCK data until the backend ships medication/appointment routes
+    auth/              provider switch (backend | supabase), session store, useSession, RequireRole
+    supabase/          browser client (null when env vars are missing)
+    demo/              demo care plan + scripted landing conversation + local Foggy answers
+    hooks/             useAsync, usePolling, useNow, useReducedMotion
+```
+
+Session storage: `localStorage["cloudcare.token"]` and `localStorage["cloudcare.user"]`.

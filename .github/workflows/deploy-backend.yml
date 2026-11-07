@@ -28,5 +28,16 @@ jobs:
             echo "RENDER_DEPLOY_HOOK_URL secret is not set; skipping. Use Manual Deploy in Render."
             exit 0
           fi
+          case "$HOOK" in
+            https://api.render.com/deploy/srv-*)
+              ;;
+            *)
+              echo "RENDER_DEPLOY_HOOK_URL does not look like a Render Deploy Hook."
+              echo "Expected the URL from Render -> cloudcare-api -> Settings -> Deploy Hook,"
+              echo "which starts with https://api.render.com/deploy/srv- and ends with ?key=..."
+              echo "The service's public URL or dashboard link will not work here."
+              exit 1
+              ;;
+          esac
           curl --fail --silent --show-error -X POST "$HOOK"
           echo "Render deploy triggered."

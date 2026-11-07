@@ -7,9 +7,11 @@ import { cn } from "@/lib/cn";
 type ModalVariant = "center" | "sheet" | "drawer";
 
 const variantClasses: Record<ModalVariant, string> = {
-  center: "m-auto w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] rounded-[2rem]",
+  // center and sheet share the same desktop width (36rem) so switching between
+  // the "Text Foggy" and "Talk to Foggy" dialogs doesn't jump.
+  center: "m-auto w-[calc(100%-2rem)] max-w-xl max-h-[calc(100dvh-2rem)] rounded-[2rem]",
   sheet:
-    "mx-0 mb-0 mt-auto h-[92dvh] max-h-[92dvh] w-full max-w-none rounded-t-[2rem] sm:m-auto sm:h-[min(760px,calc(100dvh-3rem))] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:rounded-[2rem]",
+    "mx-0 mb-0 mt-auto h-[92dvh] max-h-[92dvh] w-full max-w-none rounded-t-[2rem] sm:m-auto sm:h-[min(760px,calc(100dvh-3rem))] sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100%-2rem)] sm:max-w-xl sm:rounded-[2rem]",
   drawer: "my-0 mr-0 ml-auto h-dvh max-h-dvh w-full max-w-2xl rounded-l-[2rem] max-sm:rounded-none",
 };
 
@@ -77,7 +79,7 @@ export function Modal({
         if (e.target === e.currentTarget) onClose();
       }}
       className={cn(
-        "max-w-none overflow-hidden border-0 bg-white p-0 shadow-lift backdrop:bg-transparent open:flex open:flex-col",
+        "overflow-hidden border-0 bg-white p-0 shadow-lift backdrop:bg-transparent open:flex open:flex-col",
         variantClasses[variant],
         className,
       )}

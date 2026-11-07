@@ -96,9 +96,8 @@ export function PatientTable({
           <div className="-mx-2 hidden overflow-x-auto md:block">
             <table className="w-full border-separate border-spacing-y-1 text-left">
               <thead>
-                <tr className="text-xs font-extrabold tracking-wide text-brand-gray uppercase">
+                <tr className="text-xs font-extrabold tracking-wide whitespace-nowrap text-brand-gray uppercase">
                   <th scope="col" className="px-3 py-2">Patient</th>
-                  <th scope="col" className="px-3 py-2">Day</th>
                   <th scope="col" className="px-3 py-2">Latest risk</th>
                   <th scope="col" className="px-3 py-2 text-center">Open</th>
                   <th scope="col" className="px-3 py-2">Last check-in</th>
@@ -111,26 +110,26 @@ export function PatientTable({
                 {rows.map((r) => (
                   <tr key={r.id} className="group">
                     <td className="rounded-l-2xl bg-surface-soft px-3 py-3 group-hover:bg-surface-pale">
-                      <p className="font-extrabold text-ink">{r.full_name}</p>
-                      <p className="text-sm text-brand-gray">{r.procedure_name}</p>
+                      <p className="font-extrabold whitespace-nowrap text-ink">{r.full_name}</p>
+                      <p className="max-w-[13rem] truncate text-sm text-brand-gray" title={r.procedure_name}>
+                        {now !== null ? `Day ${daysSince(r.surgery_date, now)} · ` : ""}
+                        {r.procedure_name}
+                      </p>
                     </td>
-                    <td className="bg-surface-soft px-3 py-3 font-bold text-ink-soft tabular-nums group-hover:bg-surface-pale">
-                      {now !== null ? daysSince(r.surgery_date, now) : "–"}
-                    </td>
-                    <td className="bg-surface-soft px-3 py-3 group-hover:bg-surface-pale">
+                    <td className="bg-surface-soft px-3 py-3 whitespace-nowrap group-hover:bg-surface-pale">
                       <RiskCell row={r} />
                     </td>
                     <td className="bg-surface-soft px-3 py-3 text-center group-hover:bg-surface-pale">
                       <OpenCount n={r.open_escalations} />
                     </td>
-                    <td className="bg-surface-soft px-3 py-3 text-sm text-ink-soft group-hover:bg-surface-pale">
+                    <td className="bg-surface-soft px-3 py-3 text-sm whitespace-nowrap text-ink-soft group-hover:bg-surface-pale">
                       {r.last_checkin_at ? (now !== null ? relativeTime(r.last_checkin_at, now) : "…") : "Never"}
                     </td>
                     <td className="rounded-r-2xl bg-surface-soft px-3 py-3 text-right group-hover:bg-surface-pale">
                       <button
                         type="button"
                         onClick={() => onOpen(r)}
-                        className="inline-flex items-center gap-1 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-brand-cyan-strong ring-1 ring-line transition-colors hover:ring-brand-cyan"
+                        className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-bold whitespace-nowrap text-brand-cyan-strong ring-1 ring-line transition-colors hover:ring-brand-cyan"
                       >
                         Open <span className="sr-only">{r.full_name}</span>
                         <ChevronRight className="size-4" aria-hidden="true" />

@@ -157,7 +157,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
             <Stat icon={<HeartPulse className="size-5" />} label="High risk now" value={highRisk} tone={highRisk ? "red" : "plain"} />
           </dl>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
             <EscalationQueue
               items={escalations}
               loading={escalations === undefined}

@@ -1,0 +1,72 @@
+{
+  "model_version": "xgb-20261107-1943",
+  "trained_on": "synthetic data (ml/generate_data.py), not real patients",
+  "features": [
+    "age",
+    "days_since_surgery",
+    "has_diabetes",
+    "is_smoker",
+    "has_obesity",
+    "pain_level",
+    "temperature_f",
+    "wound_redness",
+    "wound_drainage",
+    "swelling",
+    "nausea",
+    "shortness_of_breath",
+    "mobility_level",
+    "procedure_orthopedic",
+    "procedure_abdominal",
+    "procedure_cardiac",
+    "procedure_general"
+  ],
+  "procedures": [
+    "orthopedic",
+    "abdominal",
+    "cardiac",
+    "general"
+  ],
+  "thresholds": {
+    "medium": 0.073,
+    "high": 0.199
+  },
+  "metrics": {
+    "rows_train": 4000,
+    "rows_test": 1000,
+    "complication_rate": 0.072,
+    "cv_roc_auc_mean": 0.9632,
+    "cv_roc_auc_std": 0.01,
+    "test_roc_auc": 0.9744,
+    "test_pr_auc": 0.8617,
+    "high_threshold": {
+      "precision": 0.7011,
+      "recall": 0.8472,
+      "true_pos": 61,
+      "false_pos": 26,
+      "false_neg": 11,
+      "true_neg": 902
+    },
+    "medium_threshold_recall": 0.9028,
+    "baseline_rules_roc_auc": 0.9387,
+    "baseline_rules_pr_auc": 0.7085
+  },
+  "feature_importance": {
+    "wound_drainage": 0.149,
+    "temperature_f": 0.1121,
+    "pain_level": 0.1106,
+    "wound_redness": 0.1084,
+    "shortness_of_breath": 0.1068,
+    "mobility_level": 0.0701,
+    "nausea": 0.0589,
+    "swelling": 0.0569,
+    "days_since_surgery": 0.0367,
+    "procedure_orthopedic": 0.0288,
+    "has_diabetes": 0.0267,
+    "has_obesity": 0.026,
+    "is_smoker": 0.0241,
+    "age": 0.0232,
+    "procedure_cardiac": 0.022,
+    "procedure_abdominal": 0.021,
+    "procedure_general": 0.0186
+  }
+}

@@ -14,14 +14,17 @@ const LOOP_HOLD_MS = 4200;
 function PhoneBubble({ step }: { step: ScriptStep }) {
   const mine = step.from === "patient";
   return (
-    <div className={cn("flex animate-bubble-in flex-col gap-1", mine ? "items-end" : "items-start")}>
-      <div
-        className={cn(
-          "max-w-[86%] rounded-[1.1rem] px-3 py-2 text-[0.8rem] leading-snug",
-          mine ? "rounded-br-md bg-brand-cyan text-white" : "rounded-bl-md bg-surface-pale text-ink",
-        )}
-      >
-        {step.text}
+    <div className={cn("flex animate-bubble-in flex-col gap-1", mine ? "items-end" : "items-start pl-[30px]")}>
+      <div className={cn("relative", mine ? "max-w-[86%]" : "max-w-[92%]")}>
+        {mine ? null : <FoggyAvatar size={24} decorative className="absolute bottom-0 -left-[30px]" />}
+        <div
+          className={cn(
+            "rounded-[1.1rem] px-3 py-2 text-[0.8rem] leading-snug",
+            mine ? "rounded-br-md bg-brand-cyan text-white" : "rounded-bl-md bg-surface-pale text-ink",
+          )}
+        >
+          {step.text}
+        </div>
       </div>
       {step.cite ? (
         <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[0.62rem] font-bold text-brand-cyan-strong ring-1 ring-brand-cyan/25">
@@ -83,7 +86,7 @@ export function ScriptedConversation({ className }: { className?: string }) {
     <figure className={cn("flex flex-col items-center gap-4", className)}>
       <IPhoneFrame>
         <div className="flex items-center gap-2.5 border-b border-line/70 px-4 pt-1 pb-2.5">
-          <FoggyAvatar size={34} />
+          <FoggyAvatar size={34} decorative />
           <div className="min-w-0 leading-tight">
             <p className="text-[0.85rem] font-extrabold text-ink">Foggy</p>
             <p className="truncate text-[0.66rem] text-brand-gray">Replies from your care plan</p>
@@ -98,10 +101,13 @@ export function ScriptedConversation({ className }: { className?: string }) {
             <PhoneBubble key={`${i}-${step.text}`} step={step} />
           ))}
           {typing && animate ? (
-            <div className="flex animate-bubble-in gap-1 self-start rounded-[1.1rem] rounded-bl-md bg-surface-pale px-3 py-2.5">
-              {[0, 160, 320].map((d) => (
-                <span key={d} className="size-1.5 animate-typing rounded-full bg-brand-cyan" style={{ animationDelay: `${d}ms` }} />
-              ))}
+            <div className="flex animate-bubble-in items-end gap-1.5 self-start">
+              <FoggyAvatar size={24} decorative />
+              <div className="flex gap-1 rounded-[1.1rem] rounded-bl-md bg-surface-pale px-3 py-2.5">
+                {[0, 160, 320].map((d) => (
+                  <span key={d} className="size-1.5 animate-typing rounded-full bg-brand-cyan" style={{ animationDelay: `${d}ms` }} />
+                ))}
+              </div>
             </div>
           ) : null}
         </div>

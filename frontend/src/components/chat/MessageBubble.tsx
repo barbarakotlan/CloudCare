@@ -60,7 +60,7 @@ export function MessageBubble({ message, showAvatar = true }: { message: UiMessa
             <Stethoscope className="size-4" />
           </span>
         ) : (
-          <FoggyAvatar />
+          <FoggyAvatar decorative />
         )
       ) : null}
       <div className={cn("flex max-w-[82%] flex-col gap-1.5", mine ? "items-end" : "items-start")}>

@@ -51,7 +51,7 @@ export function OurPromise() {
               </p>
             </div>
             <div className="mt-3 flex items-end gap-2">
-              <FoggyAvatar />
+              <FoggyAvatar decorative />
               <div className="flex flex-col items-start gap-1.5">
                 <p className="max-w-[90%] rounded-[1.25rem] rounded-bl-md bg-white px-4 py-2.5 text-[0.95rem] text-ink ring-1 ring-line">
                   That isn&rsquo;t in your care plan, so I won&rsquo;t guess. I&rsquo;ve sent your question to your care team.

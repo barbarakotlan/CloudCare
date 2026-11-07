@@ -66,7 +66,7 @@ export function PatientDashboard({ session }: { session: Session }) {
               className="flex h-[min(640px,85dvh)] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-soft ring-1 ring-line/70 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:h-[calc(100dvh-8rem)] lg:max-h-[760px] lg:self-start"
             >
               <div className="flex items-center gap-3 border-b border-line/70 px-5 py-4">
-                <FoggyAvatar size={42} />
+                <FoggyAvatar size={42} decorative />
                 <div className="min-w-0 flex-1">
                   <h2 id="foggy-title" className="text-lg leading-tight font-extrabold text-ink">
                     Foggy

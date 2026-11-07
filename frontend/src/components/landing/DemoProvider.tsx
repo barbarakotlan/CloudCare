@@ -28,7 +28,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         variant="sheet"
         title={
           <span className="flex items-center gap-2.5">
-            <FoggyAvatar size={36} />
+            <FoggyAvatar size={36} decorative />
             <span>
               Text Foggy
               <span className="block text-xs font-semibold text-brand-gray">Demo · Jordan&rsquo;s knee replacement plan</span>

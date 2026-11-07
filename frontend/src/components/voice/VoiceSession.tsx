@@ -81,7 +81,7 @@ function VoiceSessionInner({ agentId }: { agentId: string }) {
         )}
       >
         <span className="absolute inset-3 rounded-full bg-white shadow-soft" aria-hidden="true" />
-        <FoggyAvatar size={88} className="relative ring-0" />
+        <FoggyAvatar size={96} className="relative" />
       </div>
 
       <p role="status" aria-live="polite" className="mt-6 min-h-6 text-lg font-bold text-ink">

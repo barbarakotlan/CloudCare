@@ -141,7 +141,8 @@ export type MedicationLogStatus = "pending" | "taken" | "skipped" | "missed";
 export type MedicationLogIn = {
   /** The dose time being answered, ISO with offset (e.g. today 08:00 local). */
   scheduled_for: string;
-  status: "taken" | "skipped";
+  /** "pending" undoes an earlier taken / skipped answer. */
+  status: "taken" | "skipped" | "pending";
 };
 
 export type MedicationLogOut = {

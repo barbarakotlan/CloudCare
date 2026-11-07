@@ -3,7 +3,8 @@
  *
  *   GET  /patients/me/medications                 -> MedicationOut[]
  *   GET  /patients/me/medication-logs?since=<ISO> -> MedicationLogOut[]
- *   POST /medications/{id}/logs                   -> MedicationLogOut (taken / skipped; re-posting updates)
+ *   POST /medications/{id}/logs                   -> MedicationLogOut (taken / skipped / pending; re-posting
+ *                                                    updates, "pending" undoes an answer)
  *   GET  /patients/me/appointments                -> AppointmentOut[] (all, soonest first)
  *
  * Dose times are "HH:MM" in the patient's local time. The backend stores and

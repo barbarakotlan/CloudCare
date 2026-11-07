@@ -1,13 +1,13 @@
 "use client";
 
-import { BellRing, CalendarDays, Check, Clock3, MapPin, Pill } from "lucide-react";
+import { BellRing, CalendarDays, Check, Clock3, MapPin, Pill, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { SkeletonLines } from "@/components/ui/Skeleton";
 import type { ToastItem } from "@/components/ui/Toast";
-import { errorMessage } from "@/lib/api/client";
+import { ApiError, errorMessage } from "@/lib/api/client";
 import {
   asNeededMedications,
   buildDoses,
@@ -27,7 +27,14 @@ import { formatClock, formatDate } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
 
 type Notify = (toast: Omit<ToastItem, "id">) => void;
-type Answer = "taken" | "skipped";
+/** "pending" undoes an earlier answer. */
+type Answer = "taken" | "skipped" | "pending";
+
+const FAILURE_TITLE: Record<Answer, string> = {
+  taken: "Couldn’t save that dose",
+  skipped: "Couldn’t skip that dose",
+  pending: "Couldn’t undo that dose",
+};
 
 /** Replace any log for the same dose with `log`. */
 function upsertLog(list: MedicationLog[] | undefined, log: MedicationLog): MedicationLog[] {
@@ -58,6 +65,8 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
   );
   const appts = useAsync("reminders:appts", (signal) => getMyAppointments(signal));
   const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set());
+  // Older servers reject "pending"; hide Undo once that happens.
+  const [canUndo, setCanUndo] = useState(true);
 
   const doses = useMemo(
     () => (meds.data && logs.data && dayKey ? buildDoses(meds.data, logs.data, dayKey) : null),
@@ -91,7 +100,7 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
         medication_id: dose.medication.id,
         scheduled_for: dose.scheduled_for,
         status,
-        responded_at: new Date().toISOString(),
+        responded_at: status === "pending" ? null : new Date().toISOString(),
       }),
     );
     try {
@@ -102,10 +111,15 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
         const rest = (list ?? []).filter((l) => logKey(l.medication_id, l.scheduled_for) !== dose.key);
         return previous ? [...rest, previous] : rest;
       });
+      const unsupported =
+        status === "pending" && err instanceof ApiError && [404, 405, 422].includes(err.status);
+      if (unsupported) setCanUndo(false);
       notify({
         tone: "alert",
-        title: status === "taken" ? "Couldn’t save that dose" : "Couldn’t skip that dose",
-        body: errorMessage(err),
+        title: FAILURE_TITLE[status],
+        body: unsupported
+          ? "Undo isn’t available yet. Ask your care team if you need a dose corrected."
+          : errorMessage(err),
       });
     } finally {
       setSaving((s) => {
@@ -142,7 +156,8 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
         <ul className="flex flex-col gap-2">
           {doses.map((dose) => {
             const taken = dose.status === "taken";
-            const answered = dose.status === "skipped" || dose.status === "missed";
+            const skipped = dose.status === "skipped";
+            const answered = skipped || dose.status === "missed";
             const due = dose.status === "pending" && now !== null && dose.at <= now;
             const busy = saving.has(dose.key);
             const label = `${dose.medication.name} ${formatClock(dose.time)}`;
@@ -181,15 +196,43 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
                   </p>
                 </div>
                 {taken ? (
-                  <Badge tone="green">Taken</Badge>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Badge tone="green">Taken</Badge>
+                    {canUndo ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="px-3"
+                        disabled={busy}
+                        onClick={() => void answer(dose, "pending")}
+                        aria-label={`Undo: ${label} not taken yet`}
+                      >
+                        <Undo2 className="size-4" aria-hidden="true" />
+                        Undo
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : (
                   <div
                     className={cn(
                       "flex shrink-0 items-center justify-end gap-1",
                       // Two buttons don't fit beside the name on phones: give them their own row.
-                      due && "w-full sm:w-auto",
+                      (due || (skipped && canUndo)) && "w-full sm:w-auto",
                     )}
                   >
+                    {skipped && canUndo ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="px-3"
+                        disabled={busy}
+                        onClick={() => void answer(dose, "pending")}
+                        aria-label={`Undo skipping ${label}`}
+                      >
+                        <Undo2 className="size-4" aria-hidden="true" />
+                        Undo
+                      </Button>
+                    ) : null}
                     {due ? (
                       <Button
                         size="sm"

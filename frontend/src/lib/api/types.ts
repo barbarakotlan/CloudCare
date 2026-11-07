@@ -122,4 +122,48 @@ export type EscalationOut = {
 
 export type EscalationUpdate = { status: EscalationStatus; clinician_notes?: string | null };
 
+export type MedicationOut = {
+  id: string;
+  name: string;
+  dosage: string;
+  instructions: string | null;
+  /** "HH:MM" in the patient's local time. Empty = as needed. */
+  times_of_day: string[];
+  /** YYYY-MM-DD */
+  start_date: string;
+  /** YYYY-MM-DD */
+  end_date: string | null;
+  is_active: boolean;
+};
+
+export type MedicationLogStatus = "pending" | "taken" | "skipped" | "missed";
+
+export type MedicationLogIn = {
+  /** The dose time being answered, ISO with offset (e.g. today 08:00 local). */
+  scheduled_for: string;
+  status: "taken" | "skipped";
+};
+
+export type MedicationLogOut = {
+  id: string;
+  medication_id: string;
+  /** UTC ISO. */
+  scheduled_for: string;
+  status: MedicationLogStatus;
+  responded_at: string | null;
+};
+
+export type AppointmentStatus = "scheduled" | "completed" | "missed" | "cancelled";
+
+export type AppointmentOut = {
+  id: string;
+  title: string;
+  provider_name: string | null;
+  location: string | null;
+  /** UTC ISO. */
+  scheduled_at: string;
+  status: AppointmentStatus;
+  notes: string | null;
+};
+
 export type HealthOut = { status: string; database: string };

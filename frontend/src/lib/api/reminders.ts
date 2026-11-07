@@ -1,199 +1,144 @@
 /**
- * Medication and appointment reminders: TYPED MOCK DATA.
+ * Medication and appointment reminders.
  *
- * TODO(Barbara): the tables exist in database/scheme.sql (medications,
- * medication_logs, appointments) but the backend has no routes yet. Once
- * these ship, replace the bodies below with apiFetch calls and delete the
- * mock data. Nothing else in the UI needs to change:
- *   GET  /patients/me/medications      -> Medication[]
- *   POST /medications/{id}/logs        -> MedicationLog   (mark taken / skipped)
- *   GET  /patients/me/appointments     -> Appointment[]
+ *   GET  /patients/me/medications                 -> MedicationOut[]
+ *   GET  /patients/me/medication-logs?since=<ISO> -> MedicationLogOut[]
+ *   POST /medications/{id}/logs                   -> MedicationLogOut (taken / skipped; re-posting updates)
+ *   GET  /patients/me/appointments                -> AppointmentOut[] (all, soonest first)
+ *
+ * Dose times are "HH:MM" in the patient's local time. The backend stores and
+ * returns dose times in UTC, so doses and logs are matched by UTC milliseconds.
  */
 
-export type Medication = {
-  id: string;
-  name: string;
-  dosage: string;
-  instructions: string | null;
-  /** "HH:MM" local times. Empty = as needed. */
-  times_of_day: string[];
-  start_date: string;
-  end_date: string | null;
-  is_active: boolean;
-};
+import { parseApiDate } from "@/lib/format";
+import { apiFetch } from "./client";
+import type {
+  AppointmentOut,
+  MedicationLogIn,
+  MedicationLogOut,
+  MedicationLogStatus,
+  MedicationOut,
+} from "./types";
 
-export type MedicationLogStatus = "pending" | "taken" | "skipped" | "missed";
+export type Medication = MedicationOut;
+export type MedicationLog = MedicationLogOut;
+export type Appointment = AppointmentOut;
+export type { MedicationLogStatus };
 
-export type MedicationLog = {
-  id: string;
-  medication_id: string;
+/** One scheduled dose for today, derived from a medication and its log (if any). */
+export type Dose = {
+  /** Stable id: medication id + UTC ms of the dose time. */
+  key: string;
+  medication: Medication;
+  /** "HH:MM" local. */
+  time: string;
+  /** Local dose time as ISO with the local offset, e.g. 2026-11-07T08:00:00-05:00. */
   scheduled_for: string;
+  /** Dose time in UTC ms. */
+  at: number;
   status: MedicationLogStatus;
-  responded_at: string | null;
 };
 
-export type Appointment = {
-  id: string;
-  title: string;
-  provider_name: string | null;
-  location: string | null;
-  scheduled_at: string;
-  status: "scheduled" | "completed" | "missed" | "cancelled";
-  notes: string | null;
-};
-
-/** One scheduled dose for today, derived from a medication + its log. */
-export type Dose = { medication: Medication; time: string; scheduled_for: string; status: MedicationLogStatus };
-
 // ---------------------------------------------------------------------------
-// Mock data (matches the "Medications" section of the seeded care plan)
+// Endpoints
 // ---------------------------------------------------------------------------
 
-const MOCK_MEDICATIONS: Medication[] = [
-  {
-    id: "med-acetaminophen",
-    name: "Acetaminophen",
-    dosage: "1000 mg",
-    instructions: "Every 8 hours.",
-    times_of_day: ["06:00", "14:00", "22:00"],
-    start_date: "2026-11-04",
-    end_date: null,
-    is_active: true,
-  },
-  {
-    id: "med-aspirin",
-    name: "Aspirin",
-    dosage: "81 mg",
-    instructions: "Twice daily for 4 weeks to prevent blood clots.",
-    times_of_day: ["08:00", "20:00"],
-    start_date: "2026-11-04",
-    end_date: "2026-12-02",
-    is_active: true,
-  },
-  {
-    id: "med-oxycodone",
-    name: "Oxycodone",
-    dosage: "5 mg",
-    instructions: "Only as needed for severe pain. No driving while taking it.",
-    times_of_day: [],
-    start_date: "2026-11-04",
-    end_date: null,
-    is_active: true,
-  },
-];
+export const getMyMedications = (signal?: AbortSignal) =>
+  apiFetch<Medication[]>("/patients/me/medications", { signal });
 
-const LOG_KEY = "cloudcare.mock.medlogs";
+/** Logs for doses scheduled at or after `since` (pass local midnight for today). */
+export const getMyMedicationLogs = (since: Date, signal?: AbortSignal) =>
+  apiFetch<MedicationLog[]>(`/patients/me/medication-logs?since=${encodeURIComponent(toOffsetIso(since))}`, {
+    signal,
+  });
 
-function readLogs(): Record<string, MedicationLog> {
-  try {
-    const raw = window.localStorage.getItem(LOG_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, MedicationLog>) : {};
-  } catch {
-    return {};
-  }
-}
+export const logMedication = (medicationId: string, scheduledFor: string, status: MedicationLogIn["status"]) =>
+  apiFetch<MedicationLog>(`/medications/${encodeURIComponent(medicationId)}/logs`, {
+    method: "POST",
+    body: { scheduled_for: scheduledFor, status } satisfies MedicationLogIn,
+  });
 
-function writeLogs(logs: Record<string, MedicationLog>) {
-  try {
-    window.localStorage.setItem(LOG_KEY, JSON.stringify(logs));
-  } catch {
-    // Storage unavailable (private mode): state still lives in the component.
-  }
-}
-
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function localDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function atLocalTime(base: Date, hhmm: string): Date {
-  const [h, m] = hhmm.split(":").map(Number);
-  const d = new Date(base);
-  d.setHours(h, m, 0, 0);
-  return d;
-}
+export const getMyAppointments = (signal?: AbortSignal) =>
+  apiFetch<Appointment[]>("/patients/me/appointments", { signal });
 
 // ---------------------------------------------------------------------------
-// API surface (swap these for real routes)
+// Local-time helpers
 // ---------------------------------------------------------------------------
 
-export async function getMyMedications(): Promise<Medication[]> {
-  await delay(250);
-  return MOCK_MEDICATIONS.filter((m) => m.is_active);
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** YYYY-MM-DD for the local calendar day of `ms`. */
+export function localDayKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Today's scheduled doses with their taken/skipped status. */
-export async function getTodaysDoses(now: Date = new Date()): Promise<Dose[]> {
-  const meds = await getMyMedications();
-  const logs = readLogs();
+/** Local midnight of a YYYY-MM-DD day key. */
+export function startOfLocalDay(dayKey: string): Date {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+/** ISO string in local time with its UTC offset, e.g. 2026-11-07T08:00:00-05:00. */
+export function toOffsetIso(d: Date): string {
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const abs = Math.abs(offset);
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
+  );
+}
+
+const HHMM = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+/** True when the medication is active on the given local day. */
+function activeOn(med: Medication, dayKey: string): boolean {
+  if (!med.is_active) return false;
+  if (med.start_date && med.start_date > dayKey) return false;
+  if (med.end_date && med.end_date < dayKey) return false;
+  return true;
+}
+
+export function logKey(medicationId: string, scheduledFor: string): string {
+  return `${medicationId}@${parseApiDate(scheduledFor).getTime()}`;
+}
+
+/** Today's scheduled doses (sorted by time), with status taken from the logs. */
+export function buildDoses(meds: Medication[], logs: MedicationLog[], dayKey: string): Dose[] {
+  const statusByKey = new Map(logs.map((l) => [logKey(l.medication_id, l.scheduled_for), l.status]));
+  const day = startOfLocalDay(dayKey);
   const doses: Dose[] = [];
   for (const med of meds) {
-    for (const time of med.times_of_day) {
-      const scheduled = atLocalTime(now, time);
-      const key = `${med.id}@${localDateKey(now)}T${time}`;
-      const log = logs[key];
+    if (!activeOn(med, dayKey)) continue;
+    for (const time of new Set(med.times_of_day)) {
+      const match = HHMM.exec(time);
+      if (!match) continue;
+      const when = new Date(day);
+      when.setHours(Number(match[1]), Number(match[2]), 0, 0);
+      const key = `${med.id}@${when.getTime()}`;
       doses.push({
+        key,
         medication: med,
-        time,
-        scheduled_for: scheduled.toISOString(),
-        status: log?.status ?? "pending",
+        time: `${pad(Number(match[1]))}:${match[2]}`,
+        scheduled_for: toOffsetIso(when),
+        at: when.getTime(),
+        status: statusByKey.get(key) ?? "pending",
       });
     }
   }
-  return doses.sort((a, b) => a.time.localeCompare(b.time));
+  return doses.sort((a, b) => a.at - b.at || a.medication.name.localeCompare(b.medication.name));
 }
 
-export async function logMedication(
-  medicationId: string,
-  scheduledFor: string,
-  status: Exclude<MedicationLogStatus, "pending">,
-): Promise<MedicationLog> {
-  await delay(200);
-  const when = new Date(scheduledFor);
-  const time = `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
-  const key = `${medicationId}@${localDateKey(when)}T${time}`;
-  const log: MedicationLog = {
-    id: key,
-    medication_id: medicationId,
-    scheduled_for: scheduledFor,
-    status,
-    responded_at: new Date().toISOString(),
-  };
-  const logs = readLogs();
-  logs[key] = log;
-  writeLogs(logs);
-  return log;
+/** "As needed" medications (no fixed times) active today. */
+export function asNeededMedications(meds: Medication[], dayKey: string): Medication[] {
+  return meds.filter((m) => m.times_of_day.length === 0 && activeOn(m, dayKey));
 }
 
-export async function getMyAppointments(surgeryDate?: string, now: Date = new Date()): Promise<Appointment[]> {
-  await delay(250);
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(10, 30, 0, 0);
-
-  const followUp = surgeryDate ? new Date(`${surgeryDate}T09:00:00`) : new Date(now);
-  followUp.setDate(followUp.getDate() + 14);
-  if (!surgeryDate) followUp.setHours(9, 0, 0, 0);
-
-  return [
-    {
-      id: "appt-pt",
-      title: "Physical therapy",
-      provider_name: "Sam Rivera, PT",
-      location: "Outpatient Rehab, Building B",
-      scheduled_at: tomorrow.toISOString(),
-      status: "scheduled",
-      notes: "Bring your walker and wear loose shorts.",
-    },
-    {
-      id: "appt-followup",
-      title: "Post-op follow-up",
-      provider_name: "Dr. Priya Patel",
-      location: "Orthopedic Clinic, 3rd floor",
-      scheduled_at: followUp.toISOString(),
-      status: "scheduled",
-      notes: "Incision check and staple removal.",
-    },
-  ];
+/** Scheduled appointments at or after `now`, soonest first. */
+export function upcomingAppointments(appts: Appointment[], now: number): Appointment[] {
+  return appts
+    .filter((a) => a.status === "scheduled" && parseApiDate(a.scheduled_at).getTime() >= now)
+    .sort((a, b) => parseApiDate(a.scheduled_at).getTime() - parseApiDate(b.scheduled_at).getTime());
 }

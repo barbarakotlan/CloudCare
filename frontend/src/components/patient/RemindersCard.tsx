@@ -1,73 +1,167 @@
 "use client";
 
 import { BellRing, CalendarDays, Check, Clock3, MapPin, Pill } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { SkeletonLines } from "@/components/ui/Skeleton";
-import { getMyAppointments, getMyMedications, getTodaysDoses, logMedication, type Dose } from "@/lib/api/reminders";
+import type { ToastItem } from "@/components/ui/Toast";
+import { errorMessage } from "@/lib/api/client";
+import {
+  asNeededMedications,
+  buildDoses,
+  getMyAppointments,
+  getMyMedicationLogs,
+  getMyMedications,
+  localDayKey,
+  logKey,
+  logMedication,
+  startOfLocalDay,
+  upcomingAppointments,
+  type Dose,
+  type MedicationLog,
+} from "@/lib/api/reminders";
 import { cn } from "@/lib/cn";
 import { formatClock, formatDate } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
 
-function doseKey(d: Dose) {
-  return `${d.medication.id}@${d.scheduled_for}`;
+type Notify = (toast: Omit<ToastItem, "id">) => void;
+type Answer = "taken" | "skipped";
+
+/** Replace any log for the same dose with `log`. */
+function upsertLog(list: MedicationLog[] | undefined, log: MedicationLog): MedicationLog[] {
+  const key = logKey(log.medication_id, log.scheduled_for);
+  return [...(list ?? []).filter((l) => logKey(l.medication_id, l.scheduled_for) !== key), log];
 }
 
-export function RemindersCard({ surgeryDate, now }: { surgeryDate?: string; now: number | null }) {
-  const doses = useAsync("doses", () => getTodaysDoses());
-  const meds = useAsync("meds", () => getMyMedications());
-  const appts = useAsync(`appts:${surgeryDate ?? ""}`, () => getMyAppointments(surgeryDate));
-  const [saving, setSaving] = useState<string | null>(null);
+function LoadError({ what, error, onRetry }: { what: string; error: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-brand-red/6 px-4 py-3 ring-1 ring-brand-red/20">
+      <p role="alert" className="text-sm font-semibold text-brand-red-dark">
+        Couldn&rsquo;t load {what}: {error}
+      </p>
+      <Button size="sm" variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}
 
-  const asNeeded = (meds.data ?? []).filter((m) => m.times_of_day.length === 0);
-  const takenCount = (doses.data ?? []).filter((d) => d.status === "taken").length;
+export function RemindersCard({ now, notify }: { now: number | null; notify: Notify }) {
+  // The patient's local day; null until the clock is known on the client.
+  const dayKey = now === null ? null : localDayKey(now);
 
-  async function markTaken(dose: Dose) {
-    const key = doseKey(dose);
-    setSaving(key);
+  const meds = useAsync("reminders:meds", (signal) => getMyMedications(signal));
+  const logs = useAsync(dayKey === null ? null : `reminders:logs:${dayKey}`, (signal) =>
+    getMyMedicationLogs(startOfLocalDay(dayKey ?? localDayKey(Date.now())), signal),
+  );
+  const appts = useAsync("reminders:appts", (signal) => getMyAppointments(signal));
+  const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set());
+
+  const doses = useMemo(
+    () => (meds.data && logs.data && dayKey ? buildDoses(meds.data, logs.data, dayKey) : null),
+    [meds.data, logs.data, dayKey],
+  );
+  const asNeeded = useMemo(
+    () => (meds.data && dayKey ? asNeededMedications(meds.data, dayKey) : []),
+    [meds.data, dayKey],
+  );
+  const upcoming = useMemo(
+    () => (appts.data && now !== null ? upcomingAppointments(appts.data, now) : null),
+    [appts.data, now],
+  );
+
+  const scheduleError = meds.error ?? logs.error;
+  const scheduleLoading = !scheduleError && (!meds.data || (meds.data.length > 0 && !logs.data));
+  const takenCount = doses?.filter((d) => d.status === "taken").length ?? 0;
+
+  function retrySchedule() {
+    if (meds.error) meds.reload();
+    if (logs.error) logs.reload();
+  }
+
+  async function answer(dose: Dose, status: Answer) {
+    const previous = logs.data?.find((l) => logKey(l.medication_id, l.scheduled_for) === dose.key);
+    setSaving((s) => new Set(s).add(dose.key));
+    // Optimistic: show the new state right away, roll back if the server says no.
+    logs.setData((list) =>
+      upsertLog(list, {
+        id: previous?.id ?? `pending:${dose.key}`,
+        medication_id: dose.medication.id,
+        scheduled_for: dose.scheduled_for,
+        status,
+        responded_at: new Date().toISOString(),
+      }),
+    );
     try {
-      await logMedication(dose.medication.id, dose.scheduled_for, "taken");
-      doses.setData((list) => (list ?? []).map((d) => (doseKey(d) === key ? { ...d, status: "taken" } : d)));
+      const saved = await logMedication(dose.medication.id, dose.scheduled_for, status);
+      logs.setData((list) => upsertLog(list, saved));
+    } catch (err) {
+      logs.setData((list) => {
+        const rest = (list ?? []).filter((l) => logKey(l.medication_id, l.scheduled_for) !== dose.key);
+        return previous ? [...rest, previous] : rest;
+      });
+      notify({
+        tone: "alert",
+        title: status === "taken" ? "Couldn’t save that dose" : "Couldn’t skip that dose",
+        body: errorMessage(err),
+      });
     } finally {
-      setSaving(null);
+      setSaving((s) => {
+        const next = new Set(s);
+        next.delete(dose.key);
+        return next;
+      });
     }
   }
 
+  let description = "Medications and appointments";
+  if (doses && doses.length > 0) description = `${takenCount} of ${doses.length} doses taken today`;
+  else if (doses && meds.data && meds.data.length > 0) description = "No scheduled doses today";
+
   return (
-    <Card aria-labelledby="reminders-title">
+    <Card aria-labelledby="reminders-title" aria-busy={scheduleLoading || undefined}>
       <CardHeader
         id="reminders-title"
         icon={<BellRing className="size-5" aria-hidden="true" />}
         title="Today’s reminders"
-        description={doses.data ? `${takenCount} of ${doses.data.length} doses taken` : "Medications and appointments"}
-        action={
-          <Badge tone="gray" className="max-sm:hidden">
-            Sample schedule
-          </Badge>
-        }
+        description={description}
       />
 
-      {doses.loading ? <SkeletonLines lines={3} /> : null}
-      {doses.data ? (
+      {scheduleLoading ? <SkeletonLines lines={3} /> : null}
+      {scheduleError ? <LoadError what="your medications" error={scheduleError} onRetry={retrySchedule} /> : null}
+
+      {!scheduleError && meds.data && meds.data.length === 0 ? (
+        <p className="rounded-2xl bg-surface-soft p-4 text-sm text-ink-soft">
+          No medications yet. When your care team adds them, your dose reminders will show up here.
+        </p>
+      ) : null}
+
+      {!scheduleError && doses && doses.length > 0 ? (
         <ul className="flex flex-col gap-2">
-          {doses.data.map((dose) => {
-            const key = doseKey(dose);
+          {doses.map((dose) => {
             const taken = dose.status === "taken";
-            const due = !taken && now !== null && new Date(dose.scheduled_for).getTime() <= now;
+            const answered = dose.status === "skipped" || dose.status === "missed";
+            const due = dose.status === "pending" && now !== null && dose.at <= now;
+            const busy = saving.has(dose.key);
+            const label = `${dose.medication.name} ${formatClock(dose.time)}`;
             return (
               <li
-                key={key}
+                key={dose.key}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl px-3 py-2.5 ring-1 transition-colors sm:px-4",
-                  taken ? "bg-surface-soft ring-line/50" : due ? "bg-sev-medium/8 ring-sev-medium/25" : "bg-white ring-line",
+                  taken || answered
+                    ? "bg-surface-soft ring-line/50"
+                    : due
+                      ? "bg-sev-medium/8 ring-sev-medium/25"
+                      : "bg-white ring-line",
                 )}
               >
                 <span
                   className={cn(
                     "grid size-10 shrink-0 place-items-center rounded-xl",
-                    taken ? "bg-ok/12 text-ok" : "bg-surface-pale text-brand-cyan-strong",
+                    taken ? "bg-ok/12 text-ok" : answered ? "bg-white text-brand-gray" : "bg-surface-pale text-brand-cyan-strong",
                   )}
                 >
                   {taken ? <Check className="size-5" aria-hidden="true" /> : <Pill className="size-5" aria-hidden="true" />}
@@ -80,20 +174,35 @@ export function RemindersCard({ surgeryDate, now }: { surgeryDate?: string; now:
                     <Clock3 className="size-3.5" aria-hidden="true" />
                     {formatClock(dose.time)}
                     {due ? <span className="font-bold text-[#7d5600]"> · due now</span> : null}
+                    {answered ? <span className="font-semibold"> · {dose.status}</span> : null}
                   </p>
                 </div>
                 {taken ? (
                   <Badge tone="green">Taken</Badge>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant={due ? "primary" : "soft"}
-                    disabled={saving === key}
-                    onClick={() => void markTaken(dose)}
-                    aria-label={`Mark ${dose.medication.name} ${formatClock(dose.time)} as taken`}
-                  >
-                    Mark taken
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {due ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="px-3"
+                        disabled={busy}
+                        onClick={() => void answer(dose, "skipped")}
+                        aria-label={`Skip ${label}`}
+                      >
+                        Skip
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant={due ? "primary" : "soft"}
+                      disabled={busy}
+                      onClick={() => void answer(dose, "taken")}
+                      aria-label={`Mark ${label} as taken`}
+                    >
+                      Mark taken
+                    </Button>
+                  </div>
                 )}
               </li>
             );
@@ -101,7 +210,7 @@ export function RemindersCard({ surgeryDate, now }: { surgeryDate?: string; now:
         </ul>
       ) : null}
 
-      {asNeeded.length > 0 ? (
+      {!scheduleError && asNeeded.length > 0 ? (
         <div className="mt-3 rounded-2xl bg-surface-soft px-4 py-3 text-sm text-ink-soft">
           <span className="font-bold text-ink">As needed: </span>
           {asNeeded.map((m) => `${m.name} ${m.dosage}${m.instructions ? `, ${m.instructions.toLowerCase()}` : ""}`).join(" · ")}
@@ -109,10 +218,15 @@ export function RemindersCard({ surgeryDate, now }: { surgeryDate?: string; now:
       ) : null}
 
       <h3 className="mt-6 mb-2 text-sm font-extrabold tracking-wide text-brand-gray uppercase">Coming up</h3>
-      {appts.loading ? <SkeletonLines lines={2} /> : null}
-      {appts.data ? (
+      {appts.error ? (
+        <LoadError what="your appointments" error={appts.error} onRetry={appts.reload} />
+      ) : !upcoming ? (
+        <SkeletonLines lines={2} />
+      ) : upcoming.length === 0 ? (
+        <p className="rounded-2xl bg-surface-soft p-4 text-sm text-ink-soft">No upcoming appointments.</p>
+      ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
-          {appts.data.map((a) => (
+          {upcoming.map((a) => (
             <li key={a.id} className="flex gap-3 rounded-2xl bg-white p-3.5 ring-1 ring-line">
               <span className="flex size-12 shrink-0 flex-col items-center justify-center rounded-xl bg-surface-pale leading-none text-brand-cyan-strong">
                 <span className="text-[0.65rem] font-extrabold uppercase">{formatDate(a.scheduled_at, { month: "short" })}</span>
@@ -135,7 +249,7 @@ export function RemindersCard({ surgeryDate, now }: { surgeryDate?: string; now:
             </li>
           ))}
         </ul>
-      ) : null}
+      )}
     </Card>
   );
 }

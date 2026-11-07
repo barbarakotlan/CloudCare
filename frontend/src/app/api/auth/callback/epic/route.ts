@@ -39,6 +39,9 @@ function finish(request: NextRequest, outcome: { ok: true } | { ok: false; reaso
     target.searchParams.set("epic", "error");
     target.searchParams.set("reason", KNOWN_REASONS.has(outcome.reason) ? outcome.reason : "connect_failed");
   }
+  // Sign-in usually runs in a popup. The dashboard checks for an opener and,
+  // if there is one, hands it the result and closes; otherwise it loads normally.
+  target.searchParams.set("popup", "1");
 
   const response = NextResponse.redirect(target, 303);
   response.headers.set("Cache-Control", "no-store");

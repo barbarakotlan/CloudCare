@@ -1,7 +1,7 @@
 "use client";
 
 import { AudioLines } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
@@ -15,14 +15,21 @@ import type { Session } from "@/lib/auth";
 import { RequireRole } from "@/lib/auth/RequireRole";
 import { useAsync } from "@/lib/hooks/useAsync";
 import { useNow } from "@/lib/hooks/useNow";
+import { isEpicPopupReturn } from "@/lib/epicPopup";
 import { CarePlanCard } from "./CarePlanCard";
 import { CheckInCard } from "./CheckInCard";
+import { EpicPopupReturn } from "./EpicPopupReturn";
 import { GreetingBanner } from "./GreetingBanner";
 import { MyChartCard } from "./MyChartCard";
 import { RemindersCard } from "./RemindersCard";
 
+const noSubscribe = () => () => {};
+
 /** Route entry: guards the dashboard for signed-in patients. */
 export function PatientDashboardRoute() {
+  // In the MyChart popup on its way back from Epic: report to the opener instead of loading the dashboard.
+  const popupReturn = useSyncExternalStore(noSubscribe, isEpicPopupReturn, () => false);
+  if (popupReturn) return <EpicPopupReturn />;
   return <RequireRole role="patient">{(session) => <PatientDashboard session={session} />}</RequireRole>;
 }
 

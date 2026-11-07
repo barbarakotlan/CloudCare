@@ -1,7 +1,7 @@
 "use client";
 
 import { Hospital, Info, LoaderCircle, RefreshCw, ShieldCheck, Unlink } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -9,6 +9,14 @@ import { SkeletonLines } from "@/components/ui/Skeleton";
 import type { ToastItem } from "@/components/ui/Toast";
 import { ApiError, errorMessage } from "@/lib/api/client";
 import { disconnectEpic, epicErrorText, getEpicStatus, startEpicConnect, type EpicStatus } from "@/lib/api/epic";
+import {
+  broadcastEpicResult,
+  EPIC_POPUP_FEATURES,
+  EPIC_POPUP_NAME,
+  listenForEpicResult,
+  readEpicResult,
+  type EpicPopupMessage,
+} from "@/lib/epicPopup";
 import { formatDate, relativeTime } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
 import { MyChartRecords } from "./MyChartRecords";
@@ -28,21 +36,45 @@ function issuerLabel(status: EpicStatus): string {
   }
 }
 
-/** Reads ?epic=connected|error&reason= once (set by our OAuth callback), toasts, and cleans the URL. */
+function notifyResult(notify: Notify, result: EpicPopupMessage) {
+  if (result.status === "connected") {
+    notify({ tone: "success", title: "MyChart connected", body: "Your records are loading below." });
+  } else {
+    notify({ tone: "alert", title: "MyChart wasn't connected", body: epicErrorText(result.reason) });
+  }
+}
+
+/**
+ * Reads ?epic=connected|error&reason= once (set by our OAuth callback) when the
+ * dashboard itself landed there (popup blocked, or a popup that lost its opener),
+ * toasts, tells other CloudCare tabs, and cleans the URL.
+ */
 function useEpicReturnToast(notify: Notify) {
   useEffect(() => {
     const url = new URL(window.location.href);
-    const result = url.searchParams.get("epic");
-    if (!result) return;
-    if (result === "connected") {
-      notify({ tone: "success", title: "MyChart connected", body: "Your records are loading below." });
-    } else if (result === "error") {
-      notify({ tone: "alert", title: "MyChart wasn't connected", body: epicErrorText(url.searchParams.get("reason")) });
+    const result = readEpicResult(url.search);
+    if (!url.searchParams.has("epic")) return;
+    if (result) {
+      notifyResult(notify, result);
+      if (url.searchParams.get("popup") === "1") broadcastEpicResult(result);
     }
     url.searchParams.delete("epic");
     url.searchParams.delete("reason");
+    url.searchParams.delete("popup");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, [notify]);
+}
+
+/** Placeholder content while the popup waits for Epic's sign-in URL. */
+function showOpening(popup: Window) {
+  try {
+    popup.document.title = "Opening MyChart";
+    popup.document.body.style.cssText =
+      "margin:0;height:100vh;display:grid;place-items:center;font:600 16px system-ui,sans-serif;color:#1C2630;background:#F5FAFC";
+    popup.document.body.textContent = "Opening MyChart…";
+  } catch {
+    // Window already on another site from an earlier attempt; it navigates in a moment anyway.
+  }
 }
 
 export function MyChartCard({ notify, now }: { notify: Notify; now: number | null }) {
@@ -59,19 +91,98 @@ export function MyChartCard({ notify, now }: { notify: Notify; now: number | nul
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [recordsVersion, setRecordsVersion] = useState(0);
+  // The MyChart popup we're waiting on, and the status poll that backs up its message.
+  const [waiting, setWaiting] = useState(false);
+  const popupRef = useRef<Window | null>(null);
+  const pollRef = useRef<number | null>(null);
+  const connectedRef = useRef(false);
 
   useEpicReturnToast(notify);
 
   const reloadStatus = status.reload;
   const onGone = useCallback(() => reloadStatus(), [reloadStatus]);
 
+  const data = status.data;
+  const epic = data?.kind === "ok" ? data.status : null;
+  useEffect(() => {
+    connectedRef.current = Boolean(epic?.connected);
+  }, [epic?.connected]);
+
+  const stopWaiting = useCallback(() => {
+    if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    pollRef.current = null;
+    popupRef.current = null;
+    setWaiting(false);
+    setConnecting(false);
+  }, []);
+
+  // Results from the popup (postMessage) or from a popup that lost its opener (BroadcastChannel).
+  useEffect(
+    () =>
+      listenForEpicResult((result) => {
+        stopWaiting();
+        notifyResult(notify, result);
+        // Records mount (and load) when the status flips to connected; refetch only if already showing.
+        if (connectedRef.current) setRecordsVersion((v) => v + 1);
+        reloadStatus();
+      }),
+    [notify, reloadStatus, stopWaiting],
+  );
+
+  useEffect(
+    () => () => {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    },
+    [],
+  );
+
+  /** Backup for a lost message: poll /epic/status every 2 s while the popup is open. */
+  function watchPopup(popup: Window) {
+    if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    popupRef.current = popup;
+    setWaiting(true);
+    pollRef.current = window.setInterval(() => {
+      const current = popupRef.current;
+      if (!current || current.closed) {
+        stopWaiting();
+        reloadStatus();
+        return;
+      }
+      getEpicStatus().then(
+        (s) => {
+          if (s.connected && popupRef.current === current) {
+            stopWaiting();
+            reloadStatus();
+          }
+        },
+        () => {
+          // Keep waiting; the popup's own message or the next poll will tell us.
+        },
+      );
+    }, 2000);
+  }
+
   async function connect() {
+    // Open the window inside the click so popup blockers allow it, then point it at Epic.
+    const popup = window.open("", EPIC_POPUP_NAME, EPIC_POPUP_FEATURES);
+    if (popup) showOpening(popup);
     setConnecting(true);
     try {
       const url = await startEpicConnect();
-      window.location.assign(url);
-      // Leave the button in its busy state while the browser navigates away.
+      if (!popup) {
+        // Popup blocked: sign in in this tab instead. Stay busy while the browser navigates away.
+        window.location.assign(url);
+        return;
+      }
+      if (popup.closed) {
+        setConnecting(false);
+        return;
+      }
+      popup.location.href = url;
+      popup.focus();
+      watchPopup(popup);
     } catch (err) {
+      popup?.close();
       setConnecting(false);
       if (err instanceof ApiError && err.status === 503) {
         reloadStatus();
@@ -96,9 +207,6 @@ export function MyChartCard({ notify, now }: { notify: Notify; now: number | nul
       reloadStatus();
     }
   }
-
-  const data = status.data;
-  const epic = data?.kind === "ok" ? data.status : null;
 
   let badge = null;
   if (epic?.connected) badge = <Badge tone="green" dot>Connected</Badge>;
@@ -168,8 +276,19 @@ export function MyChartCard({ notify, now }: { notify: Notify; now: number | nul
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button onClick={connect} disabled={connecting} aria-live="polite">
               {connecting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
-              {connecting ? "Opening MyChart…" : epic.revoked ? "Reconnect MyChart" : "Connect MyChart"}
+              {waiting
+                ? "Waiting for MyChart…"
+                : connecting
+                  ? "Opening MyChart…"
+                  : epic.revoked
+                    ? "Reconnect MyChart"
+                    : "Connect MyChart"}
             </Button>
+            {waiting ? (
+              <Button variant="ghost" size="sm" onClick={() => popupRef.current?.focus()}>
+                Show the MyChart window
+              </Button>
+            ) : null}
             {epic.revoked ? (
               <Button variant="ghost" size="sm" onClick={() => void disconnect()} disabled={disconnecting}>
                 Remove connection

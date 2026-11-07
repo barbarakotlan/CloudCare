@@ -1,0 +1,104 @@
+"use client";
+
+import { AudioLines } from "lucide-react";
+import { useCallback, useState } from "react";
+import { AppHeader } from "@/components/app/AppHeader";
+import { ChatPanel } from "@/components/chat/ChatPanel";
+import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
+import type { UiMessage } from "@/components/chat/types";
+import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
+import { ToastViewport, useToasts } from "@/components/ui/Toast";
+import { TalkToFoggy } from "@/components/voice/TalkToFoggy";
+import { getMyCarePlan, getMyProfile } from "@/lib/api/patients";
+import type { Session } from "@/lib/auth";
+import { RequireRole } from "@/lib/auth/RequireRole";
+import { useAsync } from "@/lib/hooks/useAsync";
+import { useNow } from "@/lib/hooks/useNow";
+import { CarePlanCard } from "./CarePlanCard";
+import { CheckInCard } from "./CheckInCard";
+import { GreetingBanner } from "./GreetingBanner";
+import { RemindersCard } from "./RemindersCard";
+
+/** Route entry: guards the dashboard for signed-in patients. */
+export function PatientDashboardRoute() {
+  return <RequireRole role="patient">{(session) => <PatientDashboard session={session} />}</RequireRole>;
+}
+
+export function PatientDashboard({ session }: { session: Session }) {
+  const now = useNow();
+  const profile = useAsync("me", (signal) => getMyProfile(signal));
+  const plan = useAsync("care-plan", (signal) => getMyCarePlan(signal));
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const { toasts, push, dismiss } = useToasts();
+
+  const onEscalated = useCallback(
+    (m: UiMessage) =>
+      push(
+        m.redFlag
+          ? { tone: "alert", title: "Care team alerted", body: "If this is an emergency, call 911 now." }
+          : { tone: "info", title: "Sent to your care team", body: "Foggy didn’t guess. A person will follow up." },
+      ),
+    [push],
+  );
+
+  return (
+    <>
+      <AppHeader user={session.user} />
+      <main id="main" className="flex-1 bg-surface-soft">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+          <GreetingBanner
+            profile={profile.data}
+            fallbackName={session.user.full_name}
+            now={now}
+            error={profile.error}
+            onTalk={() => setVoiceOpen(true)}
+          />
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
+            <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+              <RemindersCard surgeryDate={profile.data?.surgery_date} now={now} />
+            </div>
+
+            <section
+              aria-labelledby="foggy-title"
+              className="flex h-[min(640px,85dvh)] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-soft ring-1 ring-line/70 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:h-[calc(100dvh-8rem)] lg:max-h-[760px] lg:self-start"
+            >
+              <div className="flex items-center gap-3 border-b border-line/70 px-5 py-4">
+                <FoggyAvatar size={42} />
+                <div className="min-w-0 flex-1">
+                  <h2 id="foggy-title" className="text-lg leading-tight font-extrabold text-ink">
+                    Foggy
+                  </h2>
+                  <p className="truncate text-sm text-brand-gray">Answers from your care plan, 24/7</p>
+                </div>
+                <Button variant="soft" size="sm" onClick={() => setVoiceOpen(true)} aria-haspopup="dialog">
+                  <AudioLines className="size-4" aria-hidden="true" />
+                  Talk
+                </Button>
+              </div>
+              <ChatPanel mode="live" className="flex-1" onEscalated={onEscalated} />
+            </section>
+
+            <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+              <CheckInCard now={now} />
+            </div>
+            <div className="min-w-0 lg:col-start-1 lg:row-start-3">
+              <CarePlanCard plan={plan.data} loading={plan.loading} error={plan.error} />
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <Modal
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        title="Talk to Foggy"
+        description="Hands-free answers from your care plan."
+      >
+        <TalkToFoggy />
+      </Modal>
+      <ToastViewport toasts={toasts} onDismiss={dismiss} />
+    </>
+  );
+}

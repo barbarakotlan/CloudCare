@@ -10,18 +10,18 @@ export function SiteHeader() {
           <BrandLockup size={44} />
         </Link>
         <div className="flex items-center gap-1 sm:gap-2">
-          <a
-            href="#how-it-works"
+          <Link
+            href="/#how-it-works"
             className="hidden rounded-full px-4 py-2 text-[0.95rem] font-bold text-ink-soft transition-colors hover:bg-surface-pale hover:text-ink md:inline-flex"
           >
             How it works
-          </a>
-          <a
-            href="#our-promise"
+          </Link>
+          <Link
+            href="/#our-promise"
             className="hidden rounded-full px-4 py-2 text-[0.95rem] font-bold text-ink-soft transition-colors hover:bg-surface-pale hover:text-ink md:inline-flex"
           >
             Our promise
-          </a>
+          </Link>
           <ButtonLink href="/login" variant="secondary" size="sm" className="h-10 px-5">
             Log in
           </ButtonLink>

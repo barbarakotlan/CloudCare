@@ -45,6 +45,16 @@ export default function LoginPage() {
           <h1 className="text-3xl font-black tracking-tight text-ink sm:text-4xl">Welcome back</h1>
           <p className="mt-2 text-ink-soft">Choose how you&rsquo;re signing in.</p>
           <LoginForm />
+          <p className="mt-6 text-center text-sm text-brand-gray">
+            By signing in you agree to our{" "}
+            <Link
+              href="/terms"
+              className="font-bold text-brand-cyan-strong underline decoration-brand-cyan/40 underline-offset-2 hover:decoration-brand-cyan-strong"
+            >
+              Terms
+            </Link>
+            .
+          </p>
         </div>
       </main>
     </div>

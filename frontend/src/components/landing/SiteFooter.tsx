@@ -34,12 +34,15 @@ export function SiteFooter() {
             </ul>
           </div>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold text-brand-cyan-strong">
-            <a href="#how-it-works" className="hover:underline">
+            <Link href="/#how-it-works" className="hover:underline">
               How it works
-            </a>
-            <a href="#our-promise" className="hover:underline">
+            </Link>
+            <Link href="/#our-promise" className="hover:underline">
               Our promise
-            </a>
+            </Link>
+            <Link href="/terms" className="hover:underline">
+              Terms
+            </Link>
             <Link href="/login" className="hover:underline">
               Log in
             </Link>

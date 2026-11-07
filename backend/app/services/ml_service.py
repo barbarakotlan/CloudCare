@@ -1,25 +1,30 @@
 """Recovery risk score for a symptom check-in.
 
->>> PLACEHOLDER (owned by Person 3 / ML) <<<
-This rule-based version exists only so the symptoms endpoint works end to end.
-Replace the body of score_risk() with the trained XGBoost model (ml/), but
-KEEP THE SAME INPUTS AND OUTPUT so backend/app/routes/symptoms.py keeps working.
+score_risk() uses the trained XGBoost model from ml/ (see ml/train.py and ml/predict.py).
+If the model can't be loaded (file missing, xgboost not installed), it falls back to the
+hand-written rules below so the app never breaks.
 """
+
+import logging
+import sys
+from pathlib import Path
+
+log = logging.getLogger(__name__)
+
+# Make the project's ml/ folder importable from the backend.
+ML_DIR = Path(__file__).resolve().parents[3] / "ml"
+if str(ML_DIR) not in sys.path:
+    sys.path.insert(0, str(ML_DIR))
 
 MODEL_VERSION = "rules-v0"
 
-# Score thresholds. A "high" score opens an escalation for the care team.
+# Score thresholds for the fallback rules. A "high" score opens an escalation.
 MEDIUM_AT = 0.3
 HIGH_AT = 0.6
 
 
 def score_risk(symptoms: dict, patient: dict) -> dict:
-    return score_risk_rules(symptoms, patient)
-
-
-def score_risk_rules(symptoms: dict, patient: dict) -> dict:
-    """Hand-written rules. Also used as the baseline that ml/train.py compares against.
-
+    """
     Inputs:
       symptoms: one check-in, same keys as the symptom_logs table:
                 pain_level, temperature_f, wound_redness, wound_drainage, swelling,
@@ -34,6 +39,17 @@ def score_risk_rules(symptoms: dict, patient: dict) -> dict:
         "model_version": str,
       }
     """
+    try:
+        from predict import load_model  # ml/predict.py
+
+        return load_model().predict(symptoms, patient)
+    except Exception:
+        log.exception("Risk model unavailable, using fallback rules")
+        return score_risk_rules(symptoms, patient)
+
+
+def score_risk_rules(symptoms: dict, patient: dict) -> dict:
+    """Hand-written rules. Fallback if the model can't load, and the baseline ml/train.py compares against."""
     temp = symptoms.get("temperature_f")
     pain = symptoms.get("pain_level") or 0
     mobility = symptoms.get("mobility_level")

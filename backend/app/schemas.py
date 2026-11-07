@@ -119,6 +119,42 @@ class ChatReply(BaseModel):
     escalated: bool
 
 
+# ---- Reminders: medications & appointments ----------------------------------
+
+class MedicationOut(ORM):
+    id: uuid.UUID
+    name: str
+    dosage: str
+    instructions: str | None
+    times_of_day: list[str]  # "HH:MM", empty = as needed
+    start_date: date
+    end_date: date | None
+    is_active: bool
+
+
+class MedicationLogIn(BaseModel):
+    scheduled_for: datetime  # the dose time being answered, e.g. today 08:00 local, as ISO
+    status: Literal["taken", "skipped"]
+
+
+class MedicationLogOut(ORM):
+    id: uuid.UUID
+    medication_id: uuid.UUID
+    scheduled_for: datetime
+    status: Literal["pending", "taken", "skipped", "missed"]
+    responded_at: datetime | None
+
+
+class AppointmentOut(ORM):
+    id: uuid.UUID
+    title: str
+    provider_name: str | None
+    location: str | None
+    scheduled_at: datetime
+    status: Literal["scheduled", "completed", "missed", "cancelled"]
+    notes: str | None
+
+
 # ---- Escalations ------------------------------------------------------------
 
 class EscalationOut(BaseModel):

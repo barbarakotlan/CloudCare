@@ -13,10 +13,11 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import Patient, User
 
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-change-me")
 JWT_ALGORITHM = "HS256"
@@ -70,3 +71,31 @@ def get_current_user(
     if user is None:
         raise unauthorized
     return user
+
+
+# ---- Role checks ------------------------------------------------------------
+
+def require_clinician(user: User = Depends(get_current_user)) -> User:
+    if user.role != "clinician":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Clinicians only")
+    return user
+
+
+def get_current_patient(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Patient:
+    """The Patient profile of the logged-in patient user."""
+    if user.role != "patient":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Patients only")
+    patient = db.scalar(select(Patient).where(Patient.user_id == user.id))
+    if patient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No patient profile for this account")
+    return patient
+
+
+def get_patient_for_clinician(db: Session, clinician: User, patient_id: uuid.UUID) -> Patient:
+    """Loads a patient, making sure they are assigned to this clinician."""
+    patient = db.get(Patient, patient_id)
+    if patient is None or patient.clinician_id != clinician.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Patient not found")
+    return patient

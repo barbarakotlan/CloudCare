@@ -1,13 +1,12 @@
 import { backendAuth } from "./backend";
+import { AUTH_PROVIDER_NAME } from "./provider";
 import { supabaseAuth } from "./supabase";
-import type { AuthProvider, AuthProviderName } from "./types";
+import type { AuthProvider } from "./types";
 
 export { AuthError, ROLE_LABEL, type AuthProvider, type AuthProviderName } from "./types";
 export { getToken, type Session, type SessionUser } from "./session";
-
-const configured = (process.env.NEXT_PUBLIC_AUTH_PROVIDER ?? "backend").toLowerCase();
-
-export const AUTH_PROVIDER_NAME: AuthProviderName = configured === "supabase" ? "supabase" : "backend";
+export { AUTH_PROVIDER_NAME };
+export { signUpPatient, type SignUpResult } from "./supabase";
 
 /** The active provider, chosen by NEXT_PUBLIC_AUTH_PROVIDER (default `backend`). */
 export const auth: AuthProvider = AUTH_PROVIDER_NAME === "supabase" ? supabaseAuth : backendAuth;

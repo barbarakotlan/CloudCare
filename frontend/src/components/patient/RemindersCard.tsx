@@ -150,7 +150,7 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
               <li
                 key={dose.key}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 ring-1 transition-colors sm:px-4",
+                  "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl px-3 py-2.5 ring-1 transition-colors sm:flex-nowrap sm:px-4",
                   taken || answered
                     ? "bg-surface-soft ring-line/50"
                     : due
@@ -167,10 +167,13 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
                   {taken ? <Check className="size-5" aria-hidden="true" /> : <Pill className="size-5" aria-hidden="true" />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("font-bold text-ink", taken && "text-brand-gray line-through decoration-2")}>
+                  <p
+                    className={cn("truncate font-bold text-ink", taken && "text-brand-gray line-through decoration-2")}
+                    title={`${dose.medication.name} ${dose.medication.dosage}`}
+                  >
                     {dose.medication.name} <span className="font-semibold text-ink-soft">{dose.medication.dosage}</span>
                   </p>
-                  <p className="flex items-center gap-1 text-xs text-brand-gray">
+                  <p className="flex items-center gap-1 text-xs whitespace-nowrap text-brand-gray">
                     <Clock3 className="size-3.5" aria-hidden="true" />
                     {formatClock(dose.time)}
                     {due ? <span className="font-bold text-[#7d5600]"> · due now</span> : null}
@@ -180,7 +183,13 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
                 {taken ? (
                   <Badge tone="green">Taken</Badge>
                 ) : (
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div
+                    className={cn(
+                      "flex shrink-0 items-center justify-end gap-1",
+                      // Two buttons don't fit beside the name on phones: give them their own row.
+                      due && "w-full sm:w-auto",
+                    )}
+                  >
                     {due ? (
                       <Button
                         size="sm"

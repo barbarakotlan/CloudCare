@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import SUPABASE_URL, hash_password
+from app.demo_data import seed_demo_cohort
 from app.models import Appointment, CarePlan, CarePlanChunk, Medication, Patient, User
 from app.routes.patients import split_into_chunks
 
@@ -26,7 +27,10 @@ DEMO_USERS = [
     {"email": "clinician@demo.com", "full_name": "Dr. Priya Patel", "role": "clinician"},
 ]
 
-DEMO_CARE_PLAN = """Wound care:
+DEMO_PROCEDURE = "Total knee replacement (right) · spinal anesthesia + nerve block"
+_DEMO_PROCEDURE_V1 = "Total knee replacement (right)"
+
+_DEMO_CARE_PLAN_V1 = """Wound care:
 Keep the incision clean and dry. You may shower 48 hours after surgery with the waterproof dressing on. Do not soak in a bath, pool or hot tub for 4 weeks. Change the dressing every 2 days.
 
 Activity:
@@ -40,6 +44,12 @@ Take Acetaminophen 1000 mg every 8 hours. Take Oxycodone 5 mg only as needed for
 
 When to call:
 Call your surgeon if you have a fever over 101.5 F, increasing redness or drainage from the incision, calf pain or swelling, or pain not controlled by medication. Call 911 for chest pain or trouble breathing."""
+
+# v2 adds anesthesia-specific instructions (spinal + adductor canal nerve block).
+DEMO_CARE_PLAN = _DEMO_CARE_PLAN_V1 + """
+
+After anesthesia:
+You had spinal anesthesia and a nerve block in your thigh. Your leg may feel numb or weak for up to 24 hours, so only walk with help until feeling returns. The nerve block wears off in 12 to 24 hours: take your pain medicine on schedule before it wears off. Do not drive, drink alcohol or make important decisions for 24 hours. Call the anesthesia team if you have a headache that gets worse when you sit or stand, or if you cannot pass urine for 8 hours."""
 
 
 # ---- Supabase Auth (Admin API) ---------------------------------------------------
@@ -172,7 +182,7 @@ def seed_demo_users(db: Session) -> None:
         patient = Patient(
             user_id=patient_user.id,
             clinician_id=clinician.id,
-            procedure_name="Total knee replacement (right)",
+            procedure_name=DEMO_PROCEDURE,
             procedure_type="orthopedic",
             surgery_date=date.today() - timedelta(days=3),
             discharge_date=date.today() - timedelta(days=1),
@@ -190,8 +200,30 @@ def seed_demo_users(db: Session) -> None:
             plan.chunks.append(CarePlanChunk(patient_id=patient.id, chunk_index=i, section=section, content=content))
         db.add(plan)
 
+    _upgrade_demo_patient(db, patient, clinician)
     _seed_reminders(db, patient)
+    seed_demo_cohort(db, clinician, patient)
     db.commit()
+
+
+def _upgrade_demo_patient(db: Session, patient: Patient, clinician: User) -> None:
+    """Brings an older demo database up to date (anesthesia details).
+
+    Only touches data that is still exactly the original demo version, so a care plan
+    a clinician uploaded during testing is never replaced.
+    """
+    if patient.procedure_name == _DEMO_PROCEDURE_V1:
+        patient.procedure_name = DEMO_PROCEDURE
+
+    active = db.scalar(select(CarePlan).where(CarePlan.patient_id == patient.id, CarePlan.is_active))
+    if active is not None and active.raw_text == _DEMO_CARE_PLAN_V1:
+        active.is_active = False
+        db.flush()
+        plan = CarePlan(patient_id=patient.id, created_by=clinician.id,
+                        title="Total Knee Replacement: Home Recovery", raw_text=DEMO_CARE_PLAN)
+        for i, (section, content) in enumerate(split_into_chunks(DEMO_CARE_PLAN)):
+            plan.chunks.append(CarePlanChunk(patient_id=patient.id, chunk_index=i, section=section, content=content))
+        db.add(plan)
 
 
 def _seed_reminders(db: Session, patient: Patient) -> None:

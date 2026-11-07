@@ -1,0 +1,47 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.vercel
+
+# ML artifacts
+*.pkl
+*.joblib
+*.model
+ml/data/*.csv
+!ml/data/.gitkeep
+
+# Database
+*.sqlite
+*.db
+pgdata/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -6,7 +6,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import models  # noqa: F401  (registers all tables on Base)
-from app.database import Base, engine, get_db
+from app.database import Base, SessionLocal, engine, get_db
+from app.routes import auth
+from app.seed import seed_demo_users
 
 
 @asynccontextmanager
@@ -15,6 +17,8 @@ async def lifespan(app: FastAPI):
     # Postgres: tables come from database/scheme.sql instead.
     if engine.dialect.name == "sqlite":
         Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        seed_demo_users(db)
     yield
 
 
@@ -28,6 +32,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 
 @app.get("/")

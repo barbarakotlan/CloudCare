@@ -57,6 +57,24 @@ With `NEXT_PUBLIC_AUTH_PROVIDER=supabase`:
 - `src/components/app/SupabaseSessionSync.tsx` (mounted from the root layout only for this provider) restores the Supabase session on load and copies refreshed tokens into `cloudcare.token`, so API calls keep working past the one-hour token lifetime. Signing out in one tab signs out the others.
 - The demo accounts (`patient@demo.com`, `clinician@demo.com`, password `demo123`) work with both providers once the backend has seeded them into Supabase.
 
+## Voice ("Talk to Foggy")
+
+Foggy's voice is an ElevenLabs agent, defined as config in `elevenlabs/` (agent id `agent_4701m6w1ey4demdt24zb8ngs4zac`):
+
+- `elevenlabs/agent_configs/foggy.json`: system prompt (answers only from Jordan Lee's knee replacement care plan, which is embedded in the prompt; never changes a dose; 911 for chest pain, trouble breathing, heavy bleeding or fainting; short check-in), first message, LLM `gemini-3.5-flash` (temperature 0.2), voice "Sarah" (`EXAVITQu4vr4xnSDxMaL`, speed 0.9).
+- `elevenlabs/agents.json`: maps the config file to the agent id.
+- The agent is public (no signed URL) and only accepts browsers from `localhost:3000`, `cloudcare.icu` and `www.cloudcare.icu`. The browser connects with just `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` over WebRTC (`src/components/voice/VoiceSession.tsx`).
+
+To change Foggy, edit `foggy.json` and push it (the CLI reads `ELEVENLABS_API_KEY` from the environment; it lives in `.env.local` and never goes in a `NEXT_PUBLIC_` variable):
+
+```powershell
+cd elevenlabs
+npx -y @elevenlabs/cli@latest agents push
+npx -y @elevenlabs/cli@latest agents status
+```
+
+The care plan text in the prompt is a copy of the demo plan in `backend/app/seed.py`. If that plan changes, update the prompt too.
+
 ## Routes
 
 | Route | What |

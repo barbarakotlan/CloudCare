@@ -17,6 +17,7 @@ import {
   type EpicResourceKey,
 } from "@/lib/api/epic";
 import { useAsync } from "@/lib/hooks/useAsync";
+import { MyChartReconciliation } from "./MyChartReconciliation";
 
 type Tab = EpicResourceKey;
 
@@ -247,6 +248,7 @@ export function MyChartRecords({
   const current = TABS.find((t) => t.key === tab) ?? TABS[0];
   return (
     <div className="mt-5" aria-busy={records.loading}>
+      <MyChartReconciliation epicMedications={data.records.medications} />
       <SegmentedControl<Tab>
         label="MyChart record type"
         size="sm"

@@ -34,3 +34,25 @@ services:
       # answers with its keyword fallback.
       - key: OLLAMA_URL
         sync: false
+      # Epic MyChart (docs/epic-mychart.md). Without EPIC_CLIENT_ID and
+      # EPIC_TOKEN_ENCRYPTION_KEY the /epic routes answer 503.
+      - key: EPIC_CLIENT_ID
+        sync: false
+      # Optional; only for a confidential Epic client.
+      - key: EPIC_CLIENT_SECRET
+        sync: false
+      - key: EPIC_FHIR_BASE_URL
+        value: https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4
+      - key: EPIC_STU3_BASE_URL
+        value: https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/STU3
+      - key: EPIC_REDIRECT_URI
+        value: https://cloudcare.icu/api/auth/callback/epic
+      # Optional; empty uses the default scope list.
+      - key: EPIC_SCOPES
+        sync: false
+      # Fernet key (32 url-safe base64 bytes), so not generateValue. Create with
+      # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      - key: EPIC_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: EPIC_SANDBOX
+        value: "true"

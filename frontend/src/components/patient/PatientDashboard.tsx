@@ -18,6 +18,7 @@ import { useNow } from "@/lib/hooks/useNow";
 import { CarePlanCard } from "./CarePlanCard";
 import { CheckInCard } from "./CheckInCard";
 import { GreetingBanner } from "./GreetingBanner";
+import { MyChartCard } from "./MyChartCard";
 import { RemindersCard } from "./RemindersCard";
 
 /** Route entry: guards the dashboard for signed-in patients. */
@@ -85,6 +86,10 @@ export function PatientDashboard({ session }: { session: Session }) {
             </div>
             <div className="min-w-0 lg:col-start-1 lg:row-start-3">
               <CarePlanCard plan={plan.data} loading={plan.loading} error={plan.error} />
+            </div>
+            <div className="min-w-0 lg:col-start-1 lg:row-start-4">
+              {/* Includes the MyChartRecords tabs once a connection exists. */}
+              <MyChartCard notify={push} now={now} />
             </div>
           </div>
         </div>

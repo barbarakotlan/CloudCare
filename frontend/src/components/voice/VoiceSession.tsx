@@ -5,9 +5,30 @@ import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
 import { Button } from "@/components/ui/Button";
+import { getToken, readSession } from "@/lib/auth/session";
 import { cn } from "@/lib/cn";
 
 type Line = { id: number; who: "you" | "foggy"; text: string };
+
+/**
+ * Per-call values for the Foggy agent. A signed-in patient's own token lets the agent answer
+ * from that patient's care plan through CloudCare; everyone else gets the demo plan.
+ * The token travels in a `secret__` variable, which ElevenLabs only binds to tool headers
+ * and never shows to the language model or stores in transcripts.
+ */
+function voiceVariables(): Record<string, string> {
+  const session = readSession();
+  const token = getToken();
+  if (session && token && session.user.role === "patient") {
+    const firstName = session.user.full_name.trim().split(/\s+/)[0] || "there";
+    return {
+      patient_name: firstName,
+      patient_mode: "signed_in",
+      secret__patient_auth: `Bearer ${token}`,
+    };
+  }
+  return { patient_name: "Jordan", patient_mode: "demo", secret__patient_auth: "Bearer demo" };
+}
 
 export function VoiceSession({ agentId }: { agentId: string }) {
   return (
@@ -59,7 +80,7 @@ function VoiceSessionInner({ agentId }: { agentId: string }) {
       return;
     }
     setRequestingMic(false);
-    startSession({ agentId, connectionType: "webrtc" });
+    startSession({ agentId, connectionType: "webrtc", dynamicVariables: voiceVariables() });
   }
 
   const label =

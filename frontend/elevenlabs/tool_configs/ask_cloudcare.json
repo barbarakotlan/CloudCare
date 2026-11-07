@@ -1,0 +1,47 @@
+{
+    "type": "webhook",
+    "name": "ask_cloudcare",
+    "description": "Ask the CloudCare care-plan service a question for the signed-in patient. Call this for ANY question about the patient's recovery, medicines, wound or incision, activity, symptoms, pain, swelling, diet, or appointments. Pass the patient's question in their own words. The reply in message.content is the answer from the patient's own care plan; say it back in plain spoken words and never add facts. If escalated is true, the care team has been told about the question.",
+    "response_timeout_secs": 120,
+    "pre_tool_speech": "auto",
+    "interruption_mode": "allow",
+    "execution_mode": "immediate",
+    "tool_error_handling_mode": "auto",
+    "api_schema": {
+        "url": "https://cloudcare-api-q4zg.onrender.com/chat",
+        "method": "POST",
+        "content_type": "application/json",
+        "request_headers": {
+            "Authorization": {
+                "variable_name": "secret__patient_auth"
+            }
+        },
+        "request_body_schema": {
+            "type": "object",
+            "description": "The patient's question for the care-plan service.",
+            "required": [
+                "message",
+                "source"
+            ],
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The patient's question, in their own words, as one short sentence. Do not add details the patient did not say."
+                },
+                "source": {
+                    "type": "string",
+                    "constant_value": "voice"
+                }
+            }
+        },
+        "response_filter": {
+            "mode": "allow",
+            "filters": [
+                "message.content",
+                "message.answered_from_plan",
+                "message.red_flag",
+                "escalated"
+            ]
+        }
+    }
+}

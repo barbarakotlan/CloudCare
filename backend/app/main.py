@@ -1,11 +1,24 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.database import engine, get_db
+from app import models  # noqa: F401  (registers all tables on Base)
+from app.database import Base, engine, get_db
 
-app = FastAPI(title="CloudCare API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Local SQLite fallback: create tables automatically.
+    # Postgres: tables come from database/scheme.sql instead.
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(engine)
+    yield
+
+
+app = FastAPI(title="CloudCare API", lifespan=lifespan)
 
 # Let the Next.js frontend (localhost:3000) call this API.
 app.add_middleware(

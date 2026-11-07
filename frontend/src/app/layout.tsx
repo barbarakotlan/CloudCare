@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
+import { SupabaseSessionSync } from "@/components/app/SupabaseSessionSync";
+import { AUTH_PROVIDER_NAME } from "@/lib/auth/provider";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -42,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
+        {AUTH_PROVIDER_NAME === "supabase" ? <SupabaseSessionSync /> : null}
         {children}
       </body>
     </html>

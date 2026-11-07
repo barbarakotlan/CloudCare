@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -24,10 +25,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="CloudCare API", lifespan=lifespan)
 
-# Let the Next.js frontend (localhost:3000) call this API.
+# Let the Next.js frontend call this API. CORS_ORIGINS is comma-separated.
+DEFAULT_CORS_ORIGINS = "http://localhost:3000,https://cloudcare.icu,https://www.cloudcare.icu"
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in (os.getenv("CORS_ORIGINS") or DEFAULT_CORS_ORIGINS).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -33,17 +33,23 @@ type RequestOptions = {
   body?: unknown;
   /** Attach the bearer token (default true). */
   auth?: boolean;
+  /**
+   * Send this bearer token instead of the stored one (e.g. to check a token
+   * before saving it). A 401 then leaves the stored session alone.
+   */
+  token?: string;
   signal?: AbortSignal;
 };
 
 /** fetch wrapper: JSON in/out, bearer token, readable errors. */
-export async function apiFetch<T>(path: string, { method = "GET", body, auth = true, signal }: RequestOptions = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  { method = "GET", body, auth = true, token: explicitToken, signal }: RequestOptions = {},
+): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  const token = explicitToken ?? (auth ? getToken() : null);
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   let res: Response;
   try {
@@ -67,7 +73,7 @@ export async function apiFetch<T>(path: string, { method = "GET", body, auth = t
       // Non-JSON error body.
     }
     const message = messageFromDetail(detail, res.statusText || `Request failed (${res.status})`);
-    if (res.status === 401 && auth) handleUnauthorized();
+    if (res.status === 401 && auth && explicitToken === undefined) handleUnauthorized();
     throw new ApiError(res.status, message);
   }
 

@@ -1,0 +1,36 @@
+# Render Blueprint for the CloudCare API (FastAPI in backend/).
+# Render dashboard -> New -> Blueprint -> select this repo. Render asks for every
+# `sync: false` value once, when the Blueprint is first created; after that, edit
+# them on the service's Environment page.
+# Spec: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: cloudcare-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      # Render needs a full major.minor.patch version here.
+      - key: PYTHON_VERSION
+        value: 3.12.16
+      # Supabase Dashboard -> Connect -> Session pooler (port 5432).
+      - key: DATABASE_URL
+        sync: false
+      # Signs demo login tokens. Generated once by Render; never reuse the dev default.
+      - key: JWT_SECRET
+        generateValue: true
+      # Public project URL; enables Supabase access-token verification.
+      - key: SUPABASE_URL
+        value: https://tvqmphtgtnzxhyszcdmi.supabase.co
+      # Server-only. Used at startup to create the demo users in Supabase Auth.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://cloudcare.icu,https://www.cloudcare.icu,http://localhost:3000
+      # Optional: Ollama endpoint for Foggy. If unset or unreachable, Foggy
+      # answers with its keyword fallback.
+      - key: OLLAMA_URL
+        sync: false

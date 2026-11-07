@@ -38,18 +38,31 @@ All live in `frontend/.env.local` (template: `.env.local.example`).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI base URL. The backend's CORS allows `http://localhost:3000` only. |
-| `NEXT_PUBLIC_AUTH_PROVIDER` | `backend` | `backend` = FastAPI `POST /auth/login` (JWT). `supabase` = Supabase email/password (dormant until a project exists; the backend does not accept Supabase tokens yet). |
-| `NEXT_PUBLIC_SUPABASE_URL` | empty | Supabase project URL (only for the supabase provider). |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | empty | Supabase anon key (only for the supabase provider). |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI base URL. The backend's allowed origins come from its `CORS_ORIGINS` env (default `http://localhost:3000`, `https://cloudcare.icu`, `https://www.cloudcare.icu`). |
+| `NEXT_PUBLIC_AUTH_PROVIDER` | `backend` | `supabase` = Supabase Auth email/password, with patient sign-up (use this once the keys are set). `backend` = FastAPI `POST /auth/login` demo tokens; the offline fallback. |
+| `NEXT_PUBLIC_SUPABASE_URL` | empty | Supabase project URL, `https://tvqmphtgtnzxhyszcdmi.supabase.co`. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | empty | Supabase publishable key (`sb_publishable_...`). Public. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | empty | Legacy anon key; used only when the publishable key is empty. |
 | `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` | empty | ElevenLabs Conversational AI agent for "Talk to Foggy". Empty shows a friendly "not configured yet" state. |
+
+Never put a Supabase secret or `service_role` key in a `NEXT_PUBLIC_` variable: it would ship to every browser. The Supabase client refuses to start if it detects one.
+
+## Sign-in with Supabase
+
+With `NEXT_PUBLIC_AUTH_PROVIDER=supabase`:
+
+- Sign-in uses `supabase.auth.signInWithPassword`, then calls the backend's `GET /auth/me` with the Supabase access token. The backend verifies the token against the project's signing keys and creates its own user row on first sign-in. If the backend rejects the token, the login form says so.
+- The role comes from the backend (which reads `app_metadata.role`, set only by the server). `user_metadata` holds the display name and is never used for access decisions.
+- "New patient? Create an account" on `/login` signs up a patient (`full_name` goes in `user_metadata`). If email confirmation is on, the form asks the user to confirm by email; the link returns to `/login`, which picks up the session. Add `http://localhost:3000/login` and `https://cloudcare.icu/login` to the Supabase Auth redirect URLs. Doctor accounts are not self-service.
+- `src/components/app/SupabaseSessionSync.tsx` (mounted from the root layout only for this provider) restores the Supabase session on load and copies refreshed tokens into `cloudcare.token`, so API calls keep working past the one-hour token lifetime. Signing out in one tab signs out the others.
+- The demo accounts (`patient@demo.com`, `clinician@demo.com`, password `demo123`) work with both providers once the backend has seeded them into Supabase.
 
 ## Routes
 
 | Route | What |
 |---|---|
 | `/` | Landing: scripted Foggy conversation on a phone, "Try texting Foggy" (local demo chat), "Talk to Foggy" (voice). |
-| `/login` | Doctor / Patient toggle, demo credentials prefilled, redirects by role. |
+| `/login` | Doctor / Patient toggle, demo credentials prefilled, redirects by role. Patient sign-up when the Supabase provider is on. |
 | `/patient/dashboard` | Day N of recovery, care plan, reminders (mock), symptom check-in, Foggy chat, voice. |
 | `/clinician/dashboard` | Escalation queue (polls every 5 s), patients by risk, patient drawer (check-ins, transcript, care plan upload). |
 
@@ -69,7 +82,7 @@ src/
     api/               client.ts (bearer token, JSON errors), types.ts, one file per resource
                        reminders.ts is MOCK data until the backend ships medication/appointment routes
     auth/              provider switch (backend | supabase), session store, useSession, RequireRole
-    supabase/          browser client (null when env vars are missing)
+    supabase/          browser client (null when env vars are missing or the key is a secret key)
     demo/              demo care plan + scripted landing conversation + local Foggy answers
     hooks/             useAsync, usePolling, useNow, useReducedMotion
 ```

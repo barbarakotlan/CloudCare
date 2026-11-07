@@ -8,7 +8,6 @@
  *   GET  /patients/me/medications      -> Medication[]
  *   POST /medications/{id}/logs        -> MedicationLog   (mark taken / skipped)
  *   GET  /patients/me/appointments     -> Appointment[]
- * See "Asks for teammates" in CLAUDE.md.
  */
 
 export type Medication = {

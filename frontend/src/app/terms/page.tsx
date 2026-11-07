@@ -52,8 +52,8 @@ export default function TermsPage() {
           are the rules for using the CloudCare website and app (the &ldquo;Service&rdquo;). Please read them carefully.
         </p>
         <p>
-          <strong>CloudCare is a prototype.</strong> It was built for a hackathon and is still being tested and
-          improved. It is not a finished product.
+          <strong>CloudCare is an early-stage service.</strong> It is still being tested and improved, and some features
+          may change.
         </p>
       </LegalSection>
 
@@ -220,7 +220,7 @@ export default function TermsPage() {
 
       <LegalSection id="service-availability" number={9} title="Service Availability">
         <p>
-          CloudCare is a prototype. We may change, pause, or stop any feature at any time. The Service may sometimes be
+          CloudCare is an early-stage service. We may change, pause, or stop any feature at any time. The Service may sometimes be
           slow or unavailable, for example during updates or outages.
         </p>
         <p>

@@ -119,12 +119,10 @@ export function LoginForm() {
   const submitLabel = signingUp
     ? submitting
       ? "Creating your account…"
-      : "Create my patient account"
+      : "Create account"
     : submitting
       ? "Signing in…"
-      : role === "clinician"
-        ? "Sign in to the care team view"
-        : "Sign in to my recovery";
+      : "Sign in";
 
   return (
     <div className="mt-8">
@@ -262,7 +260,7 @@ export function LoginForm() {
               className="px-2 text-brand-cyan-strong"
               onClick={() => switchMode(signingUp ? "signin" : "signup")}
             >
-              {signingUp ? "Sign in" : "Create an account"}
+              {signingUp ? "Sign in" : "Create account"}
             </Button>
           </p>
         ) : null}

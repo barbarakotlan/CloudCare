@@ -47,7 +47,6 @@ export function Hero() {
           <DemoButton kind="chat" />
           <DemoButton kind="voice" />
         </div>
-        <p className="mt-4 text-sm text-brand-gray">No sign-up. The demo uses a sample knee-replacement care plan.</p>
 
         <div className="relative mt-14 sm:mt-16">
           <FloatingNote

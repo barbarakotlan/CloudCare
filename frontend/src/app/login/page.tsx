@@ -33,7 +33,6 @@ export default function LoginPage() {
             Patients get their care plan, reminders and Foggy. Care teams get a live queue of who needs them now.
           </p>
         </div>
-        <p className="text-sm text-brand-gray">Hackathon prototype. Not for real patient data.</p>
       </aside>
 
       {/* Form */}

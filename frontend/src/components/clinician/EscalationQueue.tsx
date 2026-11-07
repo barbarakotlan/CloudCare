@@ -62,7 +62,7 @@ export function EscalationQueue({
               size="sm"
               value={filter}
               onChange={onFilter}
-              className="w-auto"
+              fullWidth={false}
               options={[
                 { value: "active", label: "Active" },
                 { value: "resolved", label: "Resolved" },

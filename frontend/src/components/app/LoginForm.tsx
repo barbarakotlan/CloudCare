@@ -2,7 +2,7 @@
 
 import { ArrowRight, Eye, EyeOff, HeartPulse, LoaderCircle, Stethoscope, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useLayoutEffect, useState, type FormEvent } from "react";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -26,6 +26,12 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const errorId = useId();
+
+  // Cache Components keeps this route mounted (hidden) after we navigate to a
+  // dashboard; reset the submit state so coming back shows a usable form.
+  useLayoutEffect(() => {
+    return () => setSubmitting(false);
+  }, []);
 
   function switchRole(next: Role) {
     setRole(next);

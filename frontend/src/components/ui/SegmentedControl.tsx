@@ -16,6 +16,7 @@ export function SegmentedControl<T extends string>({
   label,
   className,
   size = "md",
+  fullWidth = true,
 }: {
   options: SegmentOption<T>[];
   value: T;
@@ -23,6 +24,7 @@ export function SegmentedControl<T extends string>({
   label: string;
   className?: string;
   size?: "sm" | "md";
+  fullWidth?: boolean;
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -42,7 +44,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn("inline-flex w-full gap-1 rounded-full bg-surface-pale p-1", className)}
+      className={cn("inline-flex gap-1 rounded-full bg-surface-pale p-1", fullWidth && "w-full", className)}
     >
       {options.map((opt, i) => {
         const selected = opt.value === value;

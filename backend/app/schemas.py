@@ -174,9 +174,17 @@ class ActionResultOut(BaseModel):
     detail: str
 
 
+class CheckinSubstep(BaseModel):
+    """The medicine dose Foggy is asking about inside step 2 (one question per dose due today)."""
+    medication_id: uuid.UUID
+    name: str
+    due_at: datetime | None  # UTC; null for an as-needed medicine ("Did you need any oxycodone today?")
+
+
 class CheckinOut(BaseModel):
     step: int | Literal["done"]  # 1 pain, 2 medicines, 3 numbness/tingling/color, 4 falls
     answers: dict
+    substep: CheckinSubstep | None = None  # only while step 2 is asking about a specific dose
 
 
 class ChatReply(BaseModel):

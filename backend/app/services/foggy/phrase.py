@@ -178,6 +178,31 @@ def checkin_question(step: str, first_checkin: bool) -> str:
     return CHECKIN_QUESTIONS[step].format(since=since)
 
 
+# Medication step, one question per scheduled dose that was due today (speech-friendly wording).
+MISSED_NOTED = "Okay, I've noted that one as missed."
+LEFT_BLANK = "Okay, I'll leave that one blank."
+NO_DOSES_DUE = "None of your medicine doses are due yet today, so we'll skip that part."
+
+
+def dose_question(dose: dict, again: bool = False) -> str:
+    """'Did you take your acetaminophen one thousand milligrams at six this morning?'"""
+    from app.services.foggy import doses
+
+    name = dose["name"].lower()
+    when = doses.spoken_time(dose["hour"], dose["minute"])
+    if again:
+        return f"Just to check, did you take your {name} at {when}, yes or no?"
+    amount = doses.spoken_dosage(dose.get("dosage") or "")
+    return f"Did you take your {name}{' ' + amount if amount else ''} at {when}?"
+
+
+def as_needed_question(name: str, again: bool = False) -> str:
+    """'Did you need any oxycodone today?' (as-needed medicines have no schedule)."""
+    if again:
+        return f"Just to check, did you need any {name.lower()} today, yes or no?"
+    return f"Did you need any {name.lower()} today?"
+
+
 # One-sentence social replies, several per kind so repeated turns don't sound canned.
 # "{n}" becomes ", Jordan" (or nothing when the name is unknown); "{hi}" becomes " Jordan" / " there".
 SOCIAL_REPLIES = {

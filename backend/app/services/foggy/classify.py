@@ -55,11 +55,19 @@ SCHEMA = {
             "required": ["pain", "meds_taken", "numbness", "fall"],
             "additionalProperties": False,
         },
+        "medication_mentions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "taken": {"type": "boolean"}},
+                "required": ["name", "taken"],
+            },
+        },
         "about_other_person": {"type": "boolean"},
         "asks_identity": {"type": "boolean"},
     },
     "required": ["route", "operational_kind", "topic_kind", "topic", "is_actual_report", "symptoms", "temperature_f", "is_consent",
-                 "checkin_answers", "about_other_person", "asks_identity"],
+                 "checkin_answers", "medication_mentions", "about_other_person", "asks_identity"],
 }
 
 PROMPT = """You are the message classifier for Foggy, an AI recovery helper app used by one patient after surgery.
@@ -107,7 +115,12 @@ FIELDS
 - checkin_answers: what the message says about the four check-in questions, including volunteered answers:
   pain 0-10 (-1 if not given); meds_taken yes / no / unclear ("I think so", "most of them") / not_given;
   numbness yes / no / not_given (new numbness, tingling, or color change); fall yes / no / not_given. When STATE
-  says a check-in question is waiting, a bare "yes", "no", or number answers that question.
+  says a check-in question is waiting, a bare "yes", "no", or number answers that question. meds_taken is "yes"
+  when the patient says they took all of their medicines ("I took everything this morning").
+- medication_mentions: each medicine the patient says they took or did not take, as {name, taken}, using the
+  medicine's name ("I skipped the aspirin" -> [{name: "aspirin", taken: false}]; "took my Tylenol and forgot the
+  aspirin" -> acetaminophen taken true, aspirin taken false). Missed, forgot, skipped = taken false. Empty when no
+  medicine is named, and for questions ("can I take my aspirin later?").
 - about_other_person: the question is about someone other than the patient.
 - asks_identity: asks who or what Foggy is, or whether it is a doctor, nurse, human, or AI.
 - operational_kind: for OPERATIONAL only: acknowledgment, thanks, greeting, goodbye, wellbeing (a brief update
@@ -147,6 +160,9 @@ EXAMPLES (for illustration; the patient's own plan is below)
 "I feel kind of weird today" -> START_CHECKIN, checkin_request
 "Let's do the check-in, pain is about a 3" -> START_CHECKIN, checkin_answers.pain 3
 (STATE: check-in waiting for meds_taken) "yep" -> OPERATIONAL, checkin_answer, meds_taken yes, is_consent n/a
+(STATE: check-in asking about the 8 AM aspirin dose) "no I forgot that one" -> OPERATIONAL, checkin_answer,
+   meds_taken no, medication_mentions []
+"Let's check in, I took everything this morning" -> START_CHECKIN, checkin_answers.meds_taken yes
 (STATE: pending offer to message care team) "yes please" -> OPERATIONAL, consent_answer, is_consent yes
 (STATE: pending offer to message care team) "okay, got it" -> OPERATIONAL, acknowledgment, is_consent unclear
 (STATE: pending offer to message care team) "can I shower though?" -> ANSWER_FROM_PLAN, is_consent n/a
@@ -163,6 +179,7 @@ class Classification:
     temperature_f: float | None = None
     is_consent: str = "n/a"
     checkin_answers: dict = field(default_factory=dict)  # only the answers given
+    medication_mentions: list[dict] = field(default_factory=list)  # [{name, taken}]
     about_other_person: bool = False
     asks_identity: bool = False
     operational_kind: str = "none"
@@ -176,7 +193,15 @@ def _state_text(state: dict) -> str:
                      f"\"{pending.get('patient_words', '')[:200]}\". Waiting for yes or no.")
     checkin = state.get("checkin_state")
     if checkin and checkin.get("awaiting"):
-        parts.append(f"Check-in in progress, waiting for: {checkin['awaiting']}. "
+        waiting = checkin["awaiting"]
+        meds = checkin.get("meds") or {}
+        if waiting == "meds_taken" and meds.get("queue"):
+            dose = meds["queue"][0]
+            waiting = (f"meds_taken (Foggy asked whether the patient took the {dose.get('name')} "
+                       f"{dose.get('dosage', '')} dose due at {dose.get('hour', 0):02d}:{dose.get('minute', 0):02d} today)")
+        elif waiting == "meds_taken" and meds.get("prn"):
+            waiting = f"meds_taken (Foggy asked whether the patient needed any {meds['prn'][0].get('name')} today)"
+        parts.append(f"Check-in in progress, waiting for: {waiting}. "
                      f"Answers so far: {json.dumps(checkin.get('answers', {}))}.")
     return " ".join(parts) or "No pending offer. No check-in in progress."
 
@@ -207,6 +232,11 @@ def parse(data: dict) -> Classification:
             answers[key] = answers_in[key]
     temp = data.get("temperature_f")
     temp = float(temp) if isinstance(temp, (int, float)) and 90 <= temp <= 110 else None
+    mentions = [
+        {"name": str(m["name"]).strip()[:60], "taken": m["taken"]}
+        for m in (data.get("medication_mentions") or [])
+        if isinstance(m, dict) and isinstance(m.get("taken"), bool) and str(m.get("name") or "").strip()
+    ]
     return Classification(
         route=route,
         topic_kind=data.get("topic_kind") if data.get("topic_kind") in TOPIC_KINDS else "other",
@@ -216,6 +246,7 @@ def parse(data: dict) -> Classification:
         temperature_f=temp,
         is_consent=data.get("is_consent") if data.get("is_consent") in ("yes", "no", "unclear") else "n/a",
         checkin_answers=answers,
+        medication_mentions=mentions,
         about_other_person=bool(data.get("about_other_person")),
         asks_identity=bool(data.get("asks_identity")),
         operational_kind=(data.get("operational_kind") if route == "OPERATIONAL"

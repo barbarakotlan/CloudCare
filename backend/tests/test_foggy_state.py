@@ -23,13 +23,17 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app import auth, models, seed  # noqa: E402,F401
 from app.database import Base, get_db  # noqa: E402
-from app.models import ChatSession, Escalation, Patient, SymptomLog, User  # noqa: E402
+from app.models import ChatSession, Escalation, Medication, MedicationLog, Patient, SymptomLog, User  # noqa: E402
 from app.services.foggy import actions as actions_mod  # noqa: E402
 from app.services.foggy import classify as classify_mod  # noqa: E402
+from app.services.foggy import doses as doses_mod  # noqa: E402
 from app.services.foggy import phrase  # noqa: E402
 from app.services.foggy.classify import Classification  # noqa: E402
 
 os.environ["LLM_PROVIDER"] = "none"  # nothing here may reach a real model
+# Jordan's doses: acetaminophen 06:00/14:00/22:00, aspirin 08:00/20:00, oxycodone as needed.
+# Every test pins the check-in clock (local time of day in CHECKIN_TIMEZONE); 15:00 by default.
+DEFAULT_NOW = "15:00"
 seed.ensure_supabase_demo_users = lambda db: {}
 
 _REAL_CLASSIFY = classify_mod.classify_message
@@ -48,13 +52,16 @@ def _restore():
     classify_mod.classify_message = _REAL_CLASSIFY
     phrase.plan_answer = _REAL_PLAN_ANSWER
     actions_mod.Escalation = _REAL_ESCALATION
+    os.environ.pop("CHECKIN_NOW_OVERRIDE", None)
 
 
-def _setup(classifications=None, plan_answer=None):
+def _setup(classifications=None, plan_answer=None, now=DEFAULT_NOW):
     from app.main import app
 
     _restore()
     _mock_model(classifications, plan_answer)
+    os.environ["CHECKIN_NOW_OVERRIDE"] = now
+    os.environ.pop("CHECKIN_TIMEZONE", None)
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False)
@@ -204,8 +211,36 @@ def test_message_failure_is_reported_truthfully():
 
 # ---- check-in ----------------------------------------------------------------------
 
+ACET_6 = "Did you take your acetaminophen one thousand milligrams at six this morning?"
+ASPIRIN_8 = "Did you take your aspirin eighty-one milligrams at eight this morning?"
+ACET_2 = "Did you take your acetaminophen one thousand milligrams at two this afternoon?"
+OXY = "Did you need any oxycodone today?"
+NUMBNESS = "Have you had any new numbness, tingling, or change in skin color?"
+
+
+def _dose_logs(TestSession, ctx):
+    """[(medicine name, local HH:MM, status, answered)] for Jordan's dose logs, by due time."""
+    zone = doses_mod.local_zone()
+    with TestSession() as db:
+        rows = db.scalars(select(MedicationLog).join(Medication)
+                          .where(Medication.patient_id == ctx["patient_id"])
+                          .order_by(MedicationLog.scheduled_for)).all()
+        return [(r.medication.name.lower(), doses_mod._as_utc(r.scheduled_for).astimezone(zone).strftime("%H:%M"),
+                 r.status, r.responded_at is not None) for r in rows]
+
+
+def _latest_checkin_text(TestSession, ctx):
+    with TestSession() as db:
+        return db.scalars(select(SymptomLog).where(SymptomLog.patient_id == ctx["patient_id"])
+                          .order_by(SymptomLog.logged_at.desc())).first().free_text
+
+
+def _assert_short(r):
+    assert len(phrase.split_sentences(r["message"]["content"])) <= 2, r["message"]["content"]
+
+
 def test_checkin_flow_and_yes_is_not_consent():
-    client, TestSession, ctx = _setup()
+    client, TestSession, ctx = _setup(now="07:00")  # only the 6 AM acetaminophen is due
     with TestSession() as db:
         logs_before = len(db.scalars(select(SymptomLog).where(SymptomLog.patient_id == ctx["patient_id"])).all())
     esc_before = len(_escalations(TestSession, ctx))
@@ -215,15 +250,18 @@ def test_checkin_flow_and_yes_is_not_consent():
     assert r["message"]["content"].endswith("What is your pain level from zero to ten?")
     r = _say(client, ctx, "Four.")
     assert r["checkin"]["step"] == 2 and r["checkin"]["answers"]["pain"] == 4
-    assert r["message"]["content"] == "Have you taken your medicines as your care plan says?"
+    assert r["message"]["content"] == ACET_6
     r = _say(client, ctx, "Yes.")
     assert r["action_result"] is None and r["pending_action"] is None and r["escalated"] is False
-    assert r["checkin"]["step"] == 3
+    assert r["checkin"]["step"] == 2 and r["message"]["content"] == OXY
+    r = _say(client, ctx, "No.")
+    assert r["checkin"]["step"] == 3 and r["message"]["content"] == NUMBNESS
     r = _say(client, ctx, "No.")
     assert r["checkin"]["step"] == 4
     assert r["message"]["content"] == "Have you had any falls since your last check-in?"  # seed has earlier check-ins
     r = _say(client, ctx, "No.")
-    assert r["checkin"] == {"step": "done", "answers": {"pain": 4, "meds_taken": "yes", "numbness": "no", "fall": "no"}}
+    assert r["checkin"] == {"step": "done", "answers": {"pain": 4, "meds_taken": "yes", "numbness": "no", "fall": "no",
+                                                        "as_needed": {"oxycodone": "no"}}, "substep": None}
     assert r["route"] == "OPERATIONAL" and r["message"]["content"].startswith("Thanks for checking in, Jordan.")
 
     with TestSession() as db:
@@ -235,21 +273,207 @@ def test_checkin_flow_and_yes_is_not_consent():
         assert session.checkin_state is None and session.pending_action is None
     assert len(_escalations(TestSession, ctx, "patient_request")) == 0
     assert len(_escalations(TestSession, ctx)) == esc_before  # low risk: nothing escalated
+    assert _dose_logs(TestSession, ctx) == [("acetaminophen", "06:00", "taken", True)]
 
 
 def test_checkin_keeps_volunteered_answers():
-    client, _, ctx = _setup()
-    r = _say(client, ctx, "Let's do a check-in. My pain is 3 and I took all my meds.")
-    assert r["checkin"]["answers"] == {"pain": 3, "meds_taken": "yes"}
+    client, _, ctx = _setup(now="05:00")  # no dose due yet
+    r = _say(client, ctx, "Let's do a check-in. My pain is 3 and no falls.")
+    assert r["checkin"]["answers"] == {"pain": 3, "meds_taken": "none_due", "fall": "no"}
     assert r["checkin"]["step"] == 3
-    assert r["message"]["content"].endswith("Have you had any new numbness, tingling, or change in skin color?")
+    assert r["message"]["content"].endswith(NUMBNESS)
     assert "pain level" not in r["message"]["content"]  # answered questions are not repeated
+    _assert_short(r)
 
 
-def test_checkin_unclear_meds_asks_which_medicine():
-    client, _, ctx = _setup()
+# ---- check-in: one medicine question per dose due today -------------------------------------
+
+def test_dose_loop_two_due_doses_writes_logs():
+    client, TestSession, ctx = _setup(now="09:00")  # acetaminophen 6 AM and aspirin 8 AM are due
+    _say(client, ctx, "Can we do my recovery check-in?")
+    r = _say(client, ctx, "3")
+    assert r["message"]["content"] == ACET_6 and r["checkin"]["step"] == 2
+    sub = r["checkin"]["substep"]
+    assert sub["name"] == "Acetaminophen" and sub["due_at"] and sub["medication_id"]
+    r = _say(client, ctx, "yes")
+    assert r["message"]["content"] == ASPIRIN_8 and r["checkin"]["substep"]["name"] == "Aspirin"
+    assert r["checkin"]["step"] == 2
+    r = _say(client, ctx, "yep")
+    assert r["message"]["content"] == OXY
+    assert r["checkin"]["substep"]["name"] == "Oxycodone" and r["checkin"]["substep"]["due_at"] is None
+    r = _say(client, ctx, "no")
+    assert r["message"]["content"] == NUMBNESS and r["checkin"]["step"] == 3 and r["checkin"]["substep"] is None
+    _say(client, ctx, "no")
+    r = _say(client, ctx, "no")
+    assert r["checkin"]["step"] == "done" and r["checkin"]["answers"]["meds_taken"] == "yes"
+
+    assert _dose_logs(TestSession, ctx) == [("acetaminophen", "06:00", "taken", True),
+                                            ("aspirin", "08:00", "taken", True)]  # no row for oxycodone
+    text = _latest_checkin_text(TestSession, ctx)
+    assert "Taken: acetaminophen 6 AM, aspirin 8 AM" in text and "Oxycodone needed today: no" in text
+    assert "Missed" not in text
+    logs = client.get("/patients/me/medication-logs", headers=ctx["patient"]).json()
+    assert sorted(entry["status"] for entry in logs) == ["taken", "taken"]
+
+
+def test_dose_already_logged_is_not_asked():
+    client, TestSession, ctx = _setup(now="09:00")
+    meds = {m["name"]: m["id"] for m in client.get("/patients/me/medications", headers=ctx["patient"]).json()}
+    six = doses_mod.now_utc().astimezone(doses_mod.local_zone()).replace(hour=6, minute=0, second=0, microsecond=0)
+    res = client.post(f"/medications/{meds['Acetaminophen']}/logs", headers=ctx["patient"],
+                      json={"scheduled_for": six.isoformat(), "status": "taken"})
+    assert res.status_code == 200, res.text
     _say(client, ctx, "check in please")
-    _say(client, ctx, "6")
+    r = _say(client, ctx, "2")
+    assert r["message"]["content"] == ASPIRIN_8  # the dashboard already has the 6 AM dose
+
+
+def test_forgot_marks_dose_missed_without_advice():
+    client, TestSession, ctx = _setup(now="09:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "2")
+    _say(client, ctx, "yes")
+    r = _say(client, ctx, "I forgot")
+    assert r["message"]["content"] == f"Okay, I've noted that one as missed. {OXY}"
+    for advice in ("take it", "double", "next dose", "skip", "later"):
+        assert advice not in r["message"]["content"].lower()
+    assert r["pending_action"] is None and r["escalated"] is False
+    assert _dose_logs(TestSession, ctx)[-1] == ("aspirin", "08:00", "skipped", True)
+    for msg in ("no", "no", "no"):
+        r = _say(client, ctx, msg)
+    assert r["checkin"]["step"] == "done"
+    assert r["checkin"]["answers"]["meds_taken"] == "no"
+    assert r["checkin"]["answers"]["missed_doses"] == ["aspirin 8 AM"]
+    assert "Missed: aspirin 8 AM" in _latest_checkin_text(TestSession, ctx)
+
+
+def test_missed_word_marks_dose_skipped():
+    client, TestSession, ctx = _setup(now="07:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "2")
+    r = _say(client, ctx, "missed it")
+    assert r["message"]["content"].startswith("Okay, I've noted that one as missed.")
+    assert _dose_logs(TestSession, ctx) == [("acetaminophen", "06:00", "skipped", True)]
+
+
+def test_unclear_dose_answer_is_asked_once_then_left_blank():
+    client, TestSession, ctx = _setup(now="09:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "2")
+    r = _say(client, ctx, "I think so")
+    assert r["message"]["content"] == "Just to check, did you take your acetaminophen at six this morning, yes or no?"
+    assert r["checkin"]["substep"]["name"] == "Acetaminophen"
+    r = _say(client, ctx, "not sure")
+    assert r["message"]["content"] == f"Okay, I'll leave that one blank. {ASPIRIN_8}"
+    assert _dose_logs(TestSession, ctx) == []  # nothing recorded for the unclear dose
+    r = _say(client, ctx, "purple")  # a reply that answers nothing counts as unclear too
+    assert r["message"]["content"].startswith("Just to check, did you take your aspirin")
+    _say(client, ctx, "yes")
+    assert _dose_logs(TestSession, ctx) == [("aspirin", "08:00", "taken", True)]
+
+
+def test_no_due_doses_skips_the_medicine_step():
+    client, TestSession, ctx = _setup(now="05:30")
+    _say(client, ctx, "Can we do my recovery check-in?")
+    r = _say(client, ctx, "1")
+    assert r["message"]["content"] == f"{phrase.NO_DOSES_DUE} {NUMBNESS}"
+    assert r["checkin"]["step"] == 3 and r["checkin"]["answers"]["meds_taken"] == "none_due"
+    assert OXY not in r["message"]["content"]
+    _say(client, ctx, "no")
+    r = _say(client, ctx, "no")
+    assert r["checkin"]["step"] == "done"
+    assert _dose_logs(TestSession, ctx) == []
+    assert "No medicine doses were due yet today" in _latest_checkin_text(TestSession, ctx)
+
+
+def test_volunteered_took_everything_marks_all_due_doses():
+    client, TestSession, ctx = _setup(now="15:00")
+    r = _say(client, ctx, "Let's do a check-in. My pain is 3 and I took everything this morning.")
+    assert r["checkin"]["answers"] == {"pain": 3}
+    assert r["message"]["content"].endswith(OXY) and r["checkin"]["step"] == 2  # only the as-needed question left
+    _assert_short(r)
+    assert _dose_logs(TestSession, ctx) == [("acetaminophen", "06:00", "taken", True),
+                                            ("aspirin", "08:00", "taken", True),
+                                            ("acetaminophen", "14:00", "taken", True)]
+
+
+def test_model_meds_taken_flag_marks_all_due_doses():
+    msg = "Morning pills all went down fine, pain is about a 2"
+    client, TestSession, ctx = _setup(
+        {msg: Classification(route="START_CHECKIN", topic_kind="checkin_request",
+                             checkin_answers={"pain": 2, "meds_taken": "yes"})}, now="09:00")
+    r = _say(client, ctx, msg)
+    assert r["message"]["content"].endswith(OXY)
+    assert [row[2] for row in _dose_logs(TestSession, ctx)] == ["taken", "taken"]
+
+
+def test_named_medicine_answers_that_medicine():
+    client, TestSession, ctx = _setup(now="15:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "4")
+    r = _say(client, ctx, "I took the acetaminophen but skipped the aspirin")
+    assert r["message"]["content"] == f"Okay, I've noted that one as missed. {ACET_2}"
+    assert _dose_logs(TestSession, ctx) == [("acetaminophen", "06:00", "taken", True),
+                                            ("aspirin", "08:00", "skipped", True)]
+
+
+def test_model_medication_mentions_are_used():
+    msg = "the tylenol went down fine this morning"
+    client, TestSession, ctx = _setup(
+        {msg: Classification(route="OPERATIONAL", topic_kind="checkin_answer",
+                             medication_mentions=[{"name": "Tylenol", "taken": True}])}, now="07:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "3")
+    r = _say(client, ctx, msg)
+    assert r["message"]["content"] == OXY
+    assert _dose_logs(TestSession, ctx) == [("acetaminophen", "06:00", "taken", True)]
+
+
+def test_as_needed_answer_goes_to_checkin_text_only():
+    client, TestSession, ctx = _setup(now="07:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "5")
+    _say(client, ctx, "yes")
+    r = _say(client, ctx, "yes, one last night")
+    assert r["message"]["content"] == NUMBNESS
+    for msg in ("no", "no"):
+        r = _say(client, ctx, msg)
+    assert r["checkin"]["answers"]["as_needed"] == {"oxycodone": "yes"}
+    assert "Oxycodone needed today: yes" in _latest_checkin_text(TestSession, ctx)
+    assert [row[0] for row in _dose_logs(TestSession, ctx)] == ["acetaminophen"]  # no oxycodone row
+
+
+def test_missed_dose_question_in_loop_offers_contact():
+    client, TestSession, ctx = _setup(now="09:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "2")
+    _say(client, ctx, "yes")
+    r = _say(client, ctx, "I missed my aspirin this morning, should I take it now?")
+    assert r["route"] == "NOT_IN_PLAN" and r["offer_contact"] is True
+    assert r["message"]["content"].startswith("Your care plan doesn't say what to do after a missed dose.")
+    assert _dose_logs(TestSession, ctx)[-1] == ("aspirin", "08:00", "skipped", True)
+    r = _say(client, ctx, "no thanks")
+    assert r["message"]["content"] == f"Okay, I won't send anything. {OXY}"  # the check-in picks up again
+
+
+def test_emergency_interrupts_dose_loop():
+    client, TestSession, ctx = _setup(now="09:00")
+    _say(client, ctx, "check in please")
+    _say(client, ctx, "2")
+    r = _say(client, ctx, "I can't breathe")
+    assert r["route"] == "EMERGENCY_911" and r["checkin"] is None
+    assert _dose_logs(TestSession, ctx) == []
+
+
+def test_generic_medicine_question_without_a_medication_list():
+    client, TestSession, ctx = _setup()
+    with TestSession() as db:
+        for med in db.scalars(select(Medication).where(Medication.patient_id == ctx["patient_id"])):
+            db.delete(med)
+        db.commit()
+    _say(client, ctx, "check in please")
+    r = _say(client, ctx, "6")
+    assert r["message"]["content"] == "Have you taken your medicines as your care plan says?"
     r = _say(client, ctx, "I think so")
     assert r["checkin"]["answers"]["meds_taken"] == "unclear"
     assert r["message"]["content"] == "Which medicine did you miss or feel unsure about?"
@@ -258,21 +482,36 @@ def test_checkin_unclear_meds_asks_which_medicine():
     assert "take" not in r["message"]["content"].lower()  # no missed-dose instructions
 
 
+def test_speech_friendly_dose_wording():
+    assert doses_mod.spoken_time(6, 0) == "six this morning"
+    assert doses_mod.spoken_time(14, 0) == "two this afternoon"
+    assert doses_mod.spoken_time(20, 0) == "eight tonight"
+    assert doses_mod.spoken_time(22, 0) == "ten tonight"
+    assert doses_mod.spoken_time(12, 0) == "noon"
+    assert doses_mod.spoken_time(18, 30) == "six thirty this evening"
+    assert doses_mod.spoken_dosage("1000 mg") == "one thousand milligrams"
+    assert doses_mod.spoken_dosage("81 mg") == "eighty-one milligrams"
+    assert doses_mod.spoken_dosage("2.5 mg") == "two point five milligrams"
+    assert doses_mod.spoken_dosage("1 tablet") == "one tablet"
+    assert doses_mod.short_time(8, 0) == "8 AM" and doses_mod.short_time(14, 0) == "2 PM"
+    assert doses_mod.mentions("No, I didn't take the aspirin", ["Aspirin"]) == [{"name": "Aspirin", "taken": False}]
+    assert doses_mod.mentions("took my Tylenol and the aspirin", ["Acetaminophen", "Aspirin"]) == [
+        {"name": "Acetaminophen", "taken": True}, {"name": "Aspirin", "taken": True}]
+    assert doses_mod.mentions("Can I take my aspirin later?", ["Aspirin"]) == []
+
+
 def test_checkin_non_answer_is_asked_again():
     client, _, ctx = _setup()
     _say(client, ctx, "check in please")
     assert _say(client, ctx, "hmm well")["message"]["content"] == "Please tell me a number from zero to ten."
-    _say(client, ctx, "5")
-    r = _say(client, ctx, "purple")
-    assert r["message"]["content"] == "Have you taken all of your medicines as your care plan says, yes or no?"
-    assert r["checkin"]["step"] == 2
+    r = _say(client, ctx, "5")
+    assert r["checkin"]["step"] == 2 and r["message"]["content"] == ACET_6
 
 
 def test_checkin_fall_interrupts_with_call_team():
-    client, TestSession, ctx = _setup()
+    client, TestSession, ctx = _setup(now="05:00")  # nothing due: pain, then numbness, then falls
     _say(client, ctx, "Can we do my recovery check-in?")
     _say(client, ctx, "2")
-    _say(client, ctx, "yes")
     _say(client, ctx, "no")
     r = _say(client, ctx, "Yes, I fell in the bathroom")
     assert r["route"] == "CALL_SURGEON" and r["offer_contact"] is True

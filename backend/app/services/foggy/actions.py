@@ -106,24 +106,42 @@ class TurnActions:
 
     # ---- check-in ----------------------------------------------------------------
 
-    def save_checkin(self, answers: dict, source: str) -> dict:
-        """SymptomLog + risk score (+ high_risk escalation) through the same path as POST /symptoms."""
+    # ---- dose answers from the check-in (the patient's own record, like the dashboard's buttons) ----
+
+    def log_dose(self, dose: dict, status: str) -> None:
+        """Marks one scheduled dose taken or skipped, as the patient said in the check-in."""
+        from app.services.foggy import doses  # imported here to keep this module's imports light
+
+        if status not in ("taken", "skipped"):
+            return
+        doses.record(self.db, dose, status)
+        log.info("foggy.action kind=dose_log status=%s", status)
+
+    def save_checkin(self, answers: dict, source: str, meds_summary: str | None = None) -> dict:
+        """SymptomLog + risk score (+ high_risk escalation) through the same path as POST /symptoms.
+
+        meds_summary: the medicine answers in plain words ("Missed: aspirin 8 AM. Taken: ...");
+        without it the single medicines answer is written as before.
+        """
         from app.routes.symptoms import record_checkin  # shared helper; imported here to avoid a cycle
 
         if "checkin" in self.done:
             return self.done["checkin"]
         detail = []
         meds = answers.get("meds_taken")
-        if meds:
+        if meds_summary:
+            detail.append(meds_summary)
+        elif meds:
             note = answers.get("meds_detail")
-            detail.append(f"medicines taken as planned: {meds}" + (f" ({note})" if note else ""))
+            detail.append(f"Medicines taken as planned: {meds}" + (f" ({note})" if note else ""))
         if answers.get("numbness"):
-            detail.append(f"new numbness, tingling or color change: {answers['numbness']}")
+            detail.append(f"New numbness, tingling or color change: {answers['numbness']}")
         if answers.get("fall"):
-            detail.append(f"falls: {answers['fall']}")
+            detail.append(f"Falls: {answers['fall']}")
         body = SymptomIn(
             pain_level=int(answers.get("pain", 0)),
-            free_text=("Foggy check-in. " + "; ".join(detail) + ".") if detail else "Foggy check-in.",
+            free_text=("Foggy check-in. " + ". ".join(d.rstrip(".") for d in detail) + ".")[:2000]
+            if detail else "Foggy check-in.",
             source="voice" if source == "voice" else "chat",
         )
         symptom_log, risk, escalated = record_checkin(self.db, self.patient, body)

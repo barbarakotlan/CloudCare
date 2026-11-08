@@ -12,6 +12,7 @@ and a goodbye counts as "no".
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.models import ChatMessage, Patient, SymptomLog
 from app.services.foggy import actions as actions_mod
 from app.services.foggy import classify as classify_mod
+from app.services.foggy import doses as doses_mod
 from app.services.foggy import lexicon, phrase
 from app.services.foggy import state as state_mod
 from app.services.foggy.classify import Classification
@@ -405,6 +407,9 @@ def _bare_answer(ctx: _Ctx):
     awaiting = checkin.get("awaiting")
     if not awaiting:
         return None
+    if awaiting == "meds_taken" and _dose_loop(checkin):
+        return (lexicon.parse_meds(ctx.message, True) or _lead_yes_no(ctx.message)
+                or doses_mod.mentions(ctx.message, _med_names(_meds(checkin))) or None)
     return _PARSERS[awaiting](ctx.message, True)
 
 
@@ -433,6 +438,12 @@ def _checkin_prompt(ctx: _Ctx) -> str:
     checkin = ctx.checkin or {}
     if checkin.get("clarifying"):
         return phrase.CHECKIN_CLARIFY[checkin["clarifying"]]
+    if checkin.get("awaiting") == "meds_taken" and _dose_loop(checkin):
+        meds = _meds(checkin)
+        again = bool(meds.get("reasked"))
+        if meds["queue"]:
+            return phrase.dose_question(meds["queue"][0], again)
+        return phrase.as_needed_question(meds["prn"][0]["name"], again)
     return phrase.checkin_question(checkin["awaiting"], checkin.get("first", False))
 
 
@@ -442,9 +453,245 @@ def _start_checkin(ctx: _Ctx) -> None:
         ctx.text = "Let's keep going with your check-in. " + _checkin_prompt(ctx)
         return
     ctx.checkin = {"awaiting": None, "answers": {}, "clarifying": None, "first": ctx.first_checkin,
-                   "started_at": datetime.now(timezone.utc).isoformat()}
+                   "started_at": datetime.now(timezone.utc).isoformat(), "meds": _init_meds(ctx)}
     answers = _extract_answers(ctx, None)
+    _absorb_meds(ctx, ctx.checkin, answers)
     _advance(ctx, answers, intro=f"Let's do a short check-in, {ctx.name}.", triggers=[])
+
+
+# ---- check-in: medicines, one question per dose due today ------------------------------------
+# checkin["meds"] = {mode, queue, prn, results, prn_results, reasked}
+#   mode "doses": ask each due dose in `queue` (oldest first), then each as-needed medicine in `prn`
+#   mode "none_due": the patient has scheduled medicines but none was due yet today (step skipped)
+#   mode "generic": no medicine list on file, so the single care-plan question is asked as before
+
+def _meds(checkin: dict | None) -> dict:
+    meds = (checkin or {}).get("meds")
+    return meds if isinstance(meds, dict) and meds.get("mode") else {"mode": "generic"}
+
+
+def _dose_loop(checkin: dict | None) -> bool:
+    meds = _meds(checkin)
+    return meds["mode"] == "doses" and bool(meds.get("queue") or meds.get("prn"))
+
+
+def _med_names(meds: dict) -> list[str]:
+    names = [d["name"] for d in meds.get("queue") or []] + [p["name"] for p in meds.get("prn") or []]
+    return list(dict.fromkeys(names))
+
+
+def _init_meds(ctx: _Ctx) -> dict:
+    plan = doses_mod.medication_plan(ctx.acts.db, ctx.acts.patient)
+    if not plan["has_meds"]:
+        return {"mode": "generic"}
+    base = {"queue": [], "prn": [], "results": [], "prn_results": {}, "reasked": False}
+    if plan["has_scheduled"] and not plan["due"]:
+        return {**base, "mode": "none_due"}  # early morning: nothing to ask yet
+    return {**base, "mode": "doses", "queue": plan["due"], "prn": plan["as_needed"]}
+
+
+_LEAD_YES = {"yes", "yeah", "yep", "yup", "ya", "yea", "sure", "did", "definitely", "absolutely", "correct"}
+_LEAD_NO = {"no", "nope", "nah", "none", "not", "didn't", "didnt", "haven't", "havent", "negative"}
+
+
+def _lead_yes_no(message: str) -> str | None:
+    """'yes' / 'no' from the first words of a short reply ("No, I didn't get to it")."""
+    words = re.sub(r"[^a-z' ]+", " ", lexicon.normalize(message)).split()
+    if not words or len(words) > 12 or "?" in message:
+        return None
+    two = " ".join(words[:2])
+    if two in ("i didn't", "i didnt", "i haven't", "i havent", "i did not", "i have not", "i forgot", "i missed"):
+        return "no"
+    if two in ("i did", "i have", "i took"):
+        return "yes"
+    if words[0] in _LEAD_NO:
+        return "no"
+    if words[0] in _LEAD_YES:
+        return "yes"
+    return None
+
+
+def _found_mentions(ctx: _Ctx, meds: dict) -> dict[str, bool]:
+    """{medicine name: taken} that the message names (word rules first, then the classifier)."""
+    names = _med_names(meds)
+    found = {m["name"]: m["taken"] for m in doses_mod.mentions(ctx.message, names)}
+    for m in (ctx.cls.medication_mentions if ctx.cls else []):
+        name = doses_mod.match_name(m["name"], names)
+        if name and name not in found:
+            found[name] = m["taken"]
+    return found
+
+
+def _settle_dose(ctx: _Ctx, meds: dict, dose: dict, status: str) -> None:
+    """taken / skipped are written to the dose log now; unsure records nothing."""
+    ctx.acts.log_dose(dose, status)
+    meds["results"].append({"name": dose["name"], "label": doses_mod.short_label(dose), "status": status})
+    key = (dose["medication_id"], dose["scheduled_for"])
+    meds["queue"] = [d for d in meds["queue"] if (d["medication_id"], d["scheduled_for"]) != key]
+    meds["reasked"] = False
+
+
+def _settle_as_needed(meds: dict, name: str, answer: str) -> None:
+    meds["prn_results"][name.lower()] = answer
+    meds["prn"] = [p for p in meds["prn"] if p["name"] != name]
+    meds["reasked"] = False
+
+
+def _apply_mentions(ctx: _Ctx, meds: dict, found: dict[str, bool], current: dict | None) -> bool:
+    """Applies named answers. A name matching the dose being asked answers only that dose;
+    another name answers every open dose of that medicine. True if a dose was marked missed."""
+    missed = False
+    for name, taken in found.items():
+        if any(p["name"] == name for p in meds["prn"]):
+            _settle_as_needed(meds, name, "yes" if taken else "no")
+            continue
+        if current is not None and current["name"] == name and current in meds["queue"]:
+            targets = [current]
+        else:
+            targets = [d for d in meds["queue"] if d["name"] == name]
+        for dose in targets:
+            _settle_dose(ctx, meds, dose, "taken" if taken else "skipped")
+        missed = missed or (bool(targets) and not taken)
+    return missed
+
+
+def _absorb_meds(ctx: _Ctx, checkin: dict, updates: dict) -> bool:
+    """Volunteered medicine answers before the dose questions ("pain is 3, I took everything").
+    Takes meds_taken out of `updates` (the dose questions decide it). True if anything was recorded."""
+    meds = _meds(checkin)
+    if meds["mode"] == "generic":
+        return False
+    blanket = updates.pop("meds_taken", None)
+    if meds["mode"] != "doses":
+        return False
+    found = _found_mentions(ctx, meds)
+    if found:
+        before = (len(meds["queue"]), len(meds["prn"]))
+        _apply_mentions(ctx, meds, found, None)
+        return before != (len(meds["queue"]), len(meds["prn"]))
+    if blanket == "yes" and meds["queue"]:
+        for dose in list(meds["queue"]):  # "I took everything": every dose due so far
+            _settle_dose(ctx, meds, dose, "taken")
+        return True
+    return False
+
+
+def _handle_dose_answer(ctx: _Ctx, checkin: dict, triggers: list[str]) -> bool:
+    """One answer in the dose loop. False when the message is something else (routed normally)."""
+    meds = _meds(checkin)
+    current = meds["queue"][0] if meds["queue"] else None
+    as_needed = None if current else meds["prn"][0]
+    text = ctx.message
+    norm = lexicon.normalize(text)
+    if "?" in text and lexicon.dose_change_requested(text):
+        return False  # "can I skip tonight's aspirin?" is a question, not an answer
+    ack = ""
+    found = _found_mentions(ctx, meds)
+    if found:
+        missed = _apply_mentions(ctx, meds, found, current)
+        ack = phrase.MISSED_NOTED if missed else ""
+        named = current["name"] if current else as_needed["name"]
+        still_open = (current in meds["queue"]) if current else any(p["name"] == named for p in meds["prn"])
+        lead = None if triggers else _lead_yes_no(text)
+        if still_open and named not in found and lead:  # "yes, and I skipped the aspirin"
+            if current:
+                _settle_dose(ctx, meds, current, "taken" if lead == "yes" else "skipped")
+                ack = phrase.MISSED_NOTED if lead == "no" else ack
+            else:
+                _settle_as_needed(meds, named, lead)
+    elif current and lexicon.MEDS_YES.search(norm) and not _lead_yes_no(text) == "no":
+        for dose in list(meds["queue"]):  # "I took everything this morning"
+            _settle_dose(ctx, meds, dose, "taken")
+    else:
+        # With a call trigger in the message ("yes, I fell"), only a clear medicine answer counts.
+        answer = lexicon.parse_meds(text, True) or (None if triggers else _lead_yes_no(text))
+        if answer is None and ctx.cls is not None:
+            answer = ctx.cls.checkin_answers.get("meds_taken")
+        if answer is None:
+            if not _looks_like_answer(text) or triggers or lexicon.dose_change_requested(text):
+                return False
+            answer = "unclear"  # a short reply that answers nothing
+        if answer == "unclear" and triggers:
+            pass  # the call-the-team reply comes first; this dose is asked again afterwards
+        elif answer == "unclear":
+            if not meds.get("reasked"):
+                meds["reasked"] = True  # ask once more, then move on
+                ctx.checkin = {**checkin, "meds": meds}
+                ctx.route, ctx.text = "START_CHECKIN", _checkin_prompt(ctx)
+                return True
+            if current:
+                _settle_dose(ctx, meds, current, "unsure")
+            else:
+                _settle_as_needed(meds, as_needed["name"], "unsure")
+            ack = phrase.LEFT_BLANK
+        elif current:
+            _settle_dose(ctx, meds, current, "taken" if answer == "yes" else "skipped")
+            ack = phrase.MISSED_NOTED if answer == "no" else ""
+        else:
+            _settle_as_needed(meds, as_needed["name"], answer)
+
+    answers = dict(checkin.get("answers") or {})
+    for step, value in _extract_answers(ctx, None).items():
+        if step in ("numbness", "fall") and step not in answers:  # volunteered later answers
+            answers[step] = value
+    ctx.checkin = {**checkin, "meds": meds}
+    _advance(ctx, answers, intro=ack, triggers=triggers)
+    if ctx.checkin and ctx.route == "START_CHECKIN" and "?" in text and \
+            lexicon.out_of_scope_kind(text)[0] == "missed_dose":
+        # "I missed it, should I take it now?": the plan has no missed-dose advice; offer contact.
+        _not_in_plan(ctx, "missed_dose", "")
+    return True
+
+
+def _settle_meds(ctx: _Ctx, checkin: dict, answers: dict) -> str:
+    """Closes the medicine step once nothing is left to ask. Returns a sentence to say, or ''."""
+    meds = _meds(checkin)
+    if meds["mode"] == "generic" or "meds_taken" in answers or _next_step(answers) != "meds_taken":
+        return ""
+    if meds["mode"] == "none_due":
+        answers["meds_taken"] = "none_due"
+        return phrase.NO_DOSES_DUE
+    if meds["queue"]:
+        meds["queue"] = doses_mod.still_open(ctx.acts.db, meds["queue"])  # answered on the dashboard meanwhile
+    if meds["queue"] or meds["prn"]:
+        return ""
+    statuses = {r["status"] for r in meds["results"]}
+    if "skipped" in statuses:
+        answers["meds_taken"] = "no"
+    elif "unsure" in statuses:
+        answers["meds_taken"] = "unclear"
+    else:
+        answers["meds_taken"] = "yes" if meds["results"] else "none_due"
+    missed = [r["label"] for r in meds["results"] if r["status"] == "skipped"]
+    if missed:
+        answers["missed_doses"] = missed
+    if meds["prn_results"]:
+        answers["as_needed"] = dict(meds["prn_results"])
+    return ""
+
+
+def _meds_summary(checkin: dict) -> str | None:
+    """The medicine answers in plain words for the saved check-in ("Missed: aspirin 8 AM")."""
+    meds = _meds(checkin)
+    if meds["mode"] == "generic":
+        return None
+    if meds["mode"] == "none_due":
+        return "No medicine doses were due yet today"
+    parts = []
+    for status, label in (("skipped", "Missed"), ("taken", "Taken"), ("unsure", "Not sure")):
+        items = [r["label"] for r in meds["results"] if r["status"] == status]
+        if items:
+            parts.append(f"{label}: {', '.join(items)}")
+    words = {"yes": "yes", "no": "no", "unsure": "not sure"}
+    for name, answer in meds["prn_results"].items():
+        parts.append(f"{name.capitalize()} needed today: {words.get(answer, answer)}")
+    return ". ".join(parts) or None
+
+
+def _compose(*parts: str) -> str:
+    """At most two sentences, always ending with the question."""
+    kept = [p.strip() for p in parts if p and p.strip()]
+    return " ".join(kept[-2:])
 
 
 def _handle_checkin_answer(ctx: _Ctx, triggers: list[str]) -> bool:
@@ -454,6 +701,8 @@ def _handle_checkin_answer(ctx: _Ctx, triggers: list[str]) -> bool:
         ctx.route, ctx.text = "OPERATIONAL", "Okay, we can finish your check-in later."
         return True
     awaiting = checkin.get("awaiting")
+    if awaiting == "meds_taken" and not checkin.get("clarifying") and _dose_loop(checkin):
+        return _handle_dose_answer(ctx, checkin, triggers)
     answers = dict(checkin.get("answers") or {})
 
     if checkin.get("clarifying") == "meds_taken":
@@ -465,7 +714,8 @@ def _handle_checkin_answer(ctx: _Ctx, triggers: list[str]) -> bool:
         return True
 
     updates = _extract_answers(ctx, awaiting)
-    if awaiting not in updates and not (set(updates) & set(CHECKIN_STEPS)):
+    absorbed = _absorb_meds(ctx, checkin, updates)
+    if awaiting not in updates and not (set(updates) & set(CHECKIN_STEPS)) and not absorbed:
         if awaiting == "pain" and "uncontrolled_pain" in triggers:
             return False  # "it's out of control": CALL_SURGEON handles it, check-in kept
         if _looks_like_answer(ctx.message) and not triggers and not lexicon.dose_change_requested(ctx.message):
@@ -489,9 +739,10 @@ def _advance(ctx: _Ctx, answers: dict, intro: str, triggers: list[str]) -> None:
     triggers = [k for k in phrase.TRIGGER_ORDER if k in triggers]
 
     checkin = {**(ctx.checkin or {}), "answers": answers}
+    note = _settle_meds(ctx, checkin, answers)
     clarify = None
-    if answers.get("meds_taken") in ("no", "unclear") and "meds_detail" not in answers and not checkin.get(
-            "asked_meds_detail"):
+    if _meds(checkin)["mode"] == "generic" and answers.get("meds_taken") in ("no", "unclear") and \
+            "meds_detail" not in answers and not checkin.get("asked_meds_detail"):
         clarify = "meds_taken"
         checkin["asked_meds_detail"] = True
     nxt = _next_step(answers)
@@ -500,7 +751,7 @@ def _advance(ctx: _Ctx, answers: dict, intro: str, triggers: list[str]) -> None:
     ctx.checkin = checkin
 
     if nxt is None and clarify is None:
-        result = ctx.acts.save_checkin(answers, ctx.source)
+        result = ctx.acts.save_checkin(answers, ctx.source, _meds_summary(checkin))
         ctx.checkin_done = {"step": "done", "answers": _public_answers(answers)}
         ctx.checkin = None
         if triggers:
@@ -517,8 +768,7 @@ def _advance(ctx: _Ctx, answers: dict, intro: str, triggers: list[str]) -> None:
         _call_surgeon(ctx, triggers)  # interrupt; the check-in continues after the offer is answered
         return
     ctx.route = "START_CHECKIN"
-    question = _checkin_prompt(ctx)
-    ctx.text = f"{intro} {question}".strip()
+    ctx.text = _compose(intro, note, _checkin_prompt(ctx))
 
 
 # ---- public shapes ---------------------------------------------------------------------------
@@ -529,8 +779,11 @@ def _public_pending(pending: dict | None) -> dict | None:
     return {"kind": pending["kind"], "recipient": pending["recipient"], "reason": pending["reason"]}
 
 
+PUBLIC_EXTRA = ("meds_detail", "missed_doses", "as_needed")
+
+
 def _public_answers(answers: dict) -> dict:
-    return {k: v for k, v in answers.items() if k in CHECKIN_STEPS or k == "meds_detail"}
+    return {k: v for k, v in answers.items() if k in CHECKIN_STEPS or k in PUBLIC_EXTRA}
 
 
 def _public_checkin(ctx: _Ctx) -> dict | None:
@@ -542,4 +795,14 @@ def _public_checkin(ctx: _Ctx) -> dict | None:
     step = CHECKIN_STEPS.index(awaiting) + 1
     if ctx.checkin.get("clarifying"):
         step = CHECKIN_STEPS.index(ctx.checkin["clarifying"]) + 1
-    return {"step": step, "answers": _public_answers(ctx.checkin.get("answers") or {})}
+    out = {"step": step, "answers": _public_answers(ctx.checkin.get("answers") or {})}
+    if awaiting == "meds_taken" and not ctx.checkin.get("clarifying") and _dose_loop(ctx.checkin):
+        meds = _meds(ctx.checkin)
+        if meds["queue"]:
+            dose = meds["queue"][0]
+            out["substep"] = {"medication_id": dose["medication_id"], "name": dose["name"],
+                              "due_at": dose["scheduled_for"]}
+        else:
+            out["substep"] = {"medication_id": meds["prn"][0]["medication_id"], "name": meds["prn"][0]["name"],
+                              "due_at": None}
+    return out

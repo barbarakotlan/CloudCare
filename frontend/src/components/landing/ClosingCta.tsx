@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CloudMark } from "@/components/brand/CloudMark";
 import { CloudShape } from "@/components/brand/CloudShape";
 import { Swoosh } from "@/components/brand/Swoosh";
@@ -18,6 +19,13 @@ export function ClosingCta() {
           <DemoButton kind="chat" />
           <DemoButton kind="voice" />
         </div>
+        <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-ink-soft">
+          The demos use a sample care plan. Read how we handle your information in our{" "}
+          <Link href="/privacy" className="font-bold text-brand-cyan-strong underline underline-offset-2">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </section>
   );

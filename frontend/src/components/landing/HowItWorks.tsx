@@ -15,7 +15,7 @@ const STEPS = [
   {
     icon: UserRoundCheck,
     title: "A human closes every loop",
-    body: "Red-flag symptoms, high-risk check-ins, and questions outside the plan go straight to your clinician’s queue.",
+    body: "For questions outside the plan, Foggy offers to message your care team and sends nothing without your OK. Red-flag symptoms get “Call 911 now,” and high-risk check-ins appear in your care team’s queue for a person to review.",
   },
 ];
 

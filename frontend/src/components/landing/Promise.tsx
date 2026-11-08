@@ -20,7 +20,7 @@ const PROMISES = [
   {
     icon: Siren,
     title: "Red flags skip the AI",
-    body: "Chest pain, trouble breathing, heavy bleeding or fainting gets an immediate “Call 911 now.” The alert also lands in your care team’s queue.",
+    body: "Chest pain, trouble breathing, heavy bleeding or fainting gets an immediate “Call 911 now.” Foggy can’t place emergency calls, so you make that call. An alert also appears in your care team’s queue.",
   },
   {
     icon: UsersRound,
@@ -40,7 +40,7 @@ export function OurPromise() {
           </h2>
           <p className="mt-5 max-w-lg text-lg leading-relaxed text-ink-soft">
             A recovery companion should be humble by design. Foggy is grounded in the instructions your clinician wrote,
-            and it hands off to a person the moment it reaches the edge of them.
+            and it offers to bring in a person the moment it reaches the edge of them.
           </p>
 
           {/* Example of a declined question */}

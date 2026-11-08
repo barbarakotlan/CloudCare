@@ -31,7 +31,7 @@ export default function TermsPage() {
       meta={
         <>
           <p>
-            <span className="font-bold text-ink">Last updated:</span> 7 November 2026
+            <span className="font-bold text-ink">Last updated:</span> 8 November 2026
           </p>
           <p>
             <span className="font-bold text-ink">Effective date:</span>{" "}
@@ -155,8 +155,11 @@ export default function TermsPage() {
         <ul>
           <li>Showing your records in your CloudCare dashboard.</li>
           <li>Helping Foggy answer your questions from your care plan.</li>
+          <li>Supporting symptom check-ins.</li>
           <li>
-            Supporting symptom check-ins and sending alerts to your care team when something may need their attention.
+            Messaging your care team when you agree to it. Foggy offers first and sends nothing without your OK.
+            High-risk check-in results and emergency warning signs also appear as alerts in your care team&rsquo;s
+            queue.
           </li>
         </ul>
         <p>
@@ -184,8 +187,13 @@ export default function TermsPage() {
             care team provided.
           </li>
           <li>
-            <strong>Questions outside your plan go to your care team.</strong> If your care plan does not cover a
-            question, Foggy is designed not to guess. Instead, it sends the question to your care team.
+            <strong>Foggy offers before it sends.</strong> If your care plan does not cover a question, Foggy is
+            designed to say so instead of guessing, and to offer to message your care team. Nothing is sent without
+            your OK.
+          </li>
+          <li>
+            <strong>Foggy cannot call 911.</strong> If you mention an emergency warning sign, such as chest pain or
+            trouble breathing, Foggy tells you to call 911 yourself. It cannot place emergency calls for you.
           </li>
           <li>
             <strong>Your care team comes first.</strong> Foggy&rsquo;s answers never override instructions from your
@@ -213,8 +221,8 @@ export default function TermsPage() {
           private.
         </p>
         <p>
-          We will publish a separate Privacy Policy that explains in more detail how we collect, use, and protect your
-          information: <Link href="/privacy">[Privacy Policy, coming soon]</Link>.
+          Our <Link href="/privacy">Privacy Policy</Link> explains what we collect, who processes it, and the choices
+          you have.
         </p>
       </LegalSection>
 

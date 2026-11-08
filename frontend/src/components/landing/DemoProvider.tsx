@@ -1,6 +1,7 @@
 "use client";
 
 import { AudioLines, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
@@ -38,6 +39,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         bodyClassName="flex flex-col"
       >
         <ChatPanel mode="demo" className="flex-1" autoFocus />
+        <DialogNote>This demo runs in your browser. Nothing you type here is sent to anyone.</DialogNote>
       </Modal>
       <Modal
         open={openKind === "voice"}
@@ -46,8 +48,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         description="Hands-free answers from the same care plan."
       >
         <TalkToFoggy onTryText={() => setOpenKind("chat")} />
+        <DialogNote>Your voice is processed by ElevenLabs to run the conversation.</DialogNote>
       </Modal>
     </DemoContext.Provider>
+  );
+}
+
+/** Small print at the bottom of a demo dialog, with the Privacy Policy link. */
+function DialogNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="shrink-0 border-t border-line px-5 py-2.5 text-xs leading-relaxed text-brand-gray">
+      {children}{" "}
+      <Link href="/privacy" className="font-bold text-brand-cyan-strong underline-offset-2 hover:underline">
+        Privacy Policy
+      </Link>
+    </p>
   );
 }
 

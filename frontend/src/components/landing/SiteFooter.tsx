@@ -36,6 +36,9 @@ export function SiteFooter() {
             <Link href="/terms" className="hover:underline">
               Terms
             </Link>
+            <Link href="/privacy" className="hover:underline">
+              Privacy
+            </Link>
             <Link href="/login" className="hover:underline">
               Log in
             </Link>

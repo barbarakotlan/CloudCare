@@ -112,6 +112,48 @@ export async function signUpPatient(
   return { session, needsEmailConfirmation: false };
 }
 
+/** Path Supabase sends people back to from a password reset email. */
+export const RESET_PASSWORD_PATH = "/reset-password";
+
+/**
+ * Emails a password reset link. Supabase answers the same way whether or not the
+ * address has an account, so the caller shows one neutral message.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new AuthError(SUPABASE_NOT_CONFIGURED);
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}${RESET_PASSWORD_PATH}`,
+  });
+  if (error) throw new AuthError(error.message);
+}
+
+/**
+ * Sets a new password on the recovery session from the reset link, then signs that
+ * session into CloudCare the same way a normal sign-in does.
+ */
+export async function completePasswordReset(password: string): Promise<Session> {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new AuthError(SUPABASE_NOT_CONFIGURED);
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new AuthError(error.message);
+
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) throw new AuthError("Your reset link has expired. Ask for a new one from the sign-in page.");
+
+  const token = data.session.access_token;
+  let me: UserOut;
+  try {
+    me = await fetchBackendUser(token);
+  } catch (err) {
+    throw new AuthError(backendRejectionMessage(err));
+  }
+  const session: Session = { token, user: { ...me, email: data.session.user.email ?? undefined } };
+  writeSession(session);
+  return session;
+}
+
 export const supabaseAuth: AuthProvider = {
   name: "supabase",
 

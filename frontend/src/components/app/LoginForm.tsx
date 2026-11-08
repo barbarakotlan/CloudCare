@@ -18,7 +18,7 @@ import { Field, Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { errorMessage } from "@/lib/api/client";
 import type { Role } from "@/lib/api/types";
-import { AUTH_PROVIDER_NAME, dashboardPathFor, login, logout, signUpPatient } from "@/lib/auth";
+import { AUTH_PROVIDER_NAME, dashboardPathFor, login, logout, requestPasswordReset, signUpPatient } from "@/lib/auth";
 import { useSession } from "@/lib/auth/useSession";
 import { formatAsTyped, optionalE164 } from "@/lib/phone";
 
@@ -34,6 +34,79 @@ type Mode = "signin" | "signup";
 
 /** Patient self sign-up exists only with Supabase Auth; the demo backend has fixed accounts. */
 const CAN_SIGN_UP = AUTH_PROVIDER_NAME === "supabase";
+/** Password reset emails come from Supabase Auth too. */
+const CAN_RESET = AUTH_PROVIDER_NAME === "supabase";
+
+type ForgotState = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "error"; message: string };
+
+/** Inline "send me a reset link" panel. Not a <form>: it sits inside the sign-in form. */
+function ForgotPassword({
+  email,
+  onEmail,
+  state,
+  onSend,
+  onClose,
+}: {
+  email: string;
+  onEmail: (value: string) => void;
+  state: ForgotState;
+  onSend: () => void;
+  onClose: () => void;
+}) {
+  const id = useId();
+  return (
+    <div role="group" aria-labelledby={`${id}-title`} className="flex flex-col gap-3 rounded-3xl bg-surface-pale p-4">
+      <p id={`${id}-title`} className="font-bold text-ink">
+        Reset your password
+      </p>
+      {state.kind === "sent" ? (
+        <p role="status" className="flex items-start gap-2 text-sm text-ink">
+          <MailCheck className="mt-0.5 size-4 shrink-0 text-brand-cyan-strong" aria-hidden="true" />
+          If that email has an account, a reset link is on its way.
+        </p>
+      ) : (
+        <>
+          <Field label="Email for the reset link" htmlFor={`${id}-email`}>
+            <Input
+              id={`${id}-email`}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => onEmail(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter sends the link instead of submitting the sign-in form around it.
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSend();
+                }
+              }}
+              aria-invalid={state.kind === "error" ? true : undefined}
+              aria-describedby={state.kind === "error" ? `${id}-err` : undefined}
+              autoFocus
+            />
+          </Field>
+          {state.kind === "error" ? (
+            <p id={`${id}-err`} role="alert" className="text-sm font-semibold text-brand-red-dark">
+              {state.message}
+            </p>
+          ) : null}
+        </>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {state.kind !== "sent" ? (
+          <Button size="sm" onClick={onSend} disabled={state.kind === "sending"}>
+            {state.kind === "sending" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
+            {state.kind === "sending" ? "Sending…" : "Send reset link"}
+          </Button>
+        ) : null}
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          {state.kind === "sent" ? "Back to sign in" : "Cancel"}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -49,8 +122,26 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotState, setForgotState] = useState<ForgotState>({ kind: "idle" });
   const errorId = useId();
   const signingUp = mode === "signup";
+
+  async function sendReset() {
+    if (forgotState.kind === "sending") return;
+    if (!forgotEmail.trim()) {
+      setForgotState({ kind: "error", message: "Enter the email you sign in with." });
+      return;
+    }
+    setForgotState({ kind: "sending" });
+    try {
+      await requestPasswordReset(forgotEmail);
+      setForgotState({ kind: "sent" });
+    } catch (err) {
+      setForgotState({ kind: "error", message: errorMessage(err) });
+    }
+  }
 
   // Cache Components keeps this route mounted (hidden) after we navigate to a
   // dashboard; reset the submit state so coming back shows a usable form.
@@ -68,6 +159,7 @@ export function LoginForm() {
 
   function switchMode(next: Mode) {
     setMode(next);
+    setForgotOpen(false);
     setError(null);
     setNotice(null);
     setShowPassword(false);
@@ -259,7 +351,31 @@ export function LoginForm() {
               {showPassword ? <EyeOff className="size-5" aria-hidden="true" /> : <Eye className="size-5" aria-hidden="true" />}
             </button>
           </div>
+          {CAN_RESET && !signingUp && !forgotOpen ? (
+            <Button
+              variant="link"
+              size="sm"
+              className="-ml-2 self-start px-2"
+              onClick={() => {
+                setForgotOpen(true);
+                setForgotEmail(email);
+                setForgotState({ kind: "idle" });
+              }}
+            >
+              Forgot password?
+            </Button>
+          ) : null}
         </Field>
+
+        {CAN_RESET && !signingUp && forgotOpen ? (
+          <ForgotPassword
+            email={forgotEmail}
+            onEmail={setForgotEmail}
+            state={forgotState}
+            onSend={() => void sendReset()}
+            onClose={() => setForgotOpen(false)}
+          />
+        ) : null}
 
         {error ? (
           <p

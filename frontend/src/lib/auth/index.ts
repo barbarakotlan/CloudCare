@@ -6,7 +6,13 @@ import type { AuthProvider } from "./types";
 export { AuthError, ROLE_LABEL, type AuthProvider, type AuthProviderName } from "./types";
 export { getToken, type Session, type SessionUser } from "./session";
 export { AUTH_PROVIDER_NAME };
-export { signUpPatient, type SignUpResult } from "./supabase";
+export {
+  completePasswordReset,
+  requestPasswordReset,
+  RESET_PASSWORD_PATH,
+  signUpPatient,
+  type SignUpResult,
+} from "./supabase";
 
 /** The active provider, chosen by NEXT_PUBLIC_AUTH_PROVIDER (default `backend`). */
 export const auth: AuthProvider = AUTH_PROVIDER_NAME === "supabase" ? supabaseAuth : backendAuth;

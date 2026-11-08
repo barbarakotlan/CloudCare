@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Callout, CounselNote, LegalPage, LegalSection, Placeholder, type TocEntry } from "@/components/legal/LegalPage";
+import { Callout, CounselNote, LegalMeta, LegalPage, LegalSection, type TocEntry } from "@/components/legal/LegalPage";
 import { SalesBubble } from "@/components/sales/SalesBubble";
 
 export const metadata: Metadata = {
@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description:
     "The terms for using CloudCare: the medical disclaimer, shared demo accounts, automated phone calls and texts, the optional Epic MyChart test connection, the limits of Foggy's AI-generated answers, and our warranty and liability terms.",
 };
+
+const LAST_UPDATED = "8 November 2026";
 
 const TOC: TocEntry[] = [
   { id: "about", label: "1. About CloudCare" },
@@ -38,17 +40,7 @@ export default function TermsPage() {
     <LegalPage
       title="Terms and Conditions"
       toc={TOC}
-      meta={
-        <>
-          <p>
-            <span className="font-bold text-ink">Last updated:</span> 8 November 2026
-          </p>
-          <p>
-            <span className="font-bold text-ink">Effective date:</span>{" "}
-            <Placeholder>Effective date, if different from the last-updated date</Placeholder>
-          </p>
-        </>
-      }
+      meta={<LegalMeta updated={LAST_UPDATED} effective={LAST_UPDATED} />}
     >
       <LegalSection id="about" number={1} title="About CloudCare">
         <p>
@@ -57,10 +49,10 @@ export default function TermsPage() {
           and ask questions to Foggy, CloudCare&rsquo;s automated recovery assistant.
         </p>
         <p>
-          CloudCare is provided by <Placeholder>Legal entity name</Placeholder> (&ldquo;CloudCare,&rdquo;
-          &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;). These Terms and Conditions (&ldquo;Terms&rdquo;)
-          are the rules for using the CloudCare website and app, including the demos on our home page (the
-          &ldquo;Service&rdquo;). Please read them carefully.
+          CloudCare is provided by CloudCare (&ldquo;CloudCare,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or
+          &ldquo;our&rdquo;). These Terms and Conditions (&ldquo;Terms&rdquo;) are the rules for using the CloudCare
+          website and app, including the demos on our home page (the &ldquo;Service&rdquo;). Please read them
+          carefully.
         </p>
         <p>
           <strong>CloudCare is an early-stage service.</strong> It is still being tested and improved, and some features
@@ -423,8 +415,7 @@ export default function TermsPage() {
           </li>
           <li>
             Our total responsibility to you for all claims about CloudCare is limited to the greater of the amount you
-            paid us to use CloudCare in the 12 months before the claim, or{" "}
-            <Placeholder>Liability cap amount, for example US$100</Placeholder>. CloudCare is free today.
+            paid us to use CloudCare in the 12 months before the claim, or US$100. CloudCare is free today.
           </li>
         </ul>
         <p>
@@ -440,10 +431,9 @@ export default function TermsPage() {
 
       <LegalSection id="law" number={17} title="Governing Law and Disputes">
         <p>
-          These Terms are governed by the laws of <Placeholder>Governing law</Placeholder>, without regard to its
-          conflict-of-laws rules. Any dispute about these Terms or CloudCare will be handled in the courts of{" "}
-          <Placeholder>Venue / jurisdiction</Placeholder>, unless the law where you live gives you the right to bring
-          it somewhere else.
+          These Terms are governed by the laws of the State of New York, without regard to its conflict-of-laws rules.
+          Any dispute about these Terms or CloudCare will be handled in the state and federal courts located in New
+          York County, New York, unless the law where you live gives you the right to bring it somewhere else.
         </p>
         <p>
           Before bringing a formal claim, please contact us first so we can try to resolve the problem informally.
@@ -455,14 +445,9 @@ export default function TermsPage() {
 
       <LegalSection id="contact" number={18} title="Contact Information">
         <p>If you have questions about these Terms or about your data, contact us:</p>
-        <ul>
-          <li>
-            <strong>Email:</strong> <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
-          </li>
-          <li>
-            <strong>Mail:</strong> <Placeholder>Mailing address, if applicable</Placeholder>
-          </li>
-        </ul>
+        <p>
+          <strong>Email:</strong> <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
+        </p>
         <p>
           If something in CloudCare is hard to use with a screen reader, keyboard, or other assistive technology, please
           tell us so we can fix it.
@@ -473,9 +458,8 @@ export default function TermsPage() {
       <LegalSection id="changes" title="Changes to these Terms">
         <p>
           We may update these Terms from time to time. When we do, we will change the &ldquo;Last updated&rdquo; date at
-          the top of this page. If a change is important, we will tell you through CloudCare or by email at least{" "}
-          <Placeholder>Notice period, for example 30 days</Placeholder> before it takes effect, unless the change is
-          needed sooner for legal or safety reasons. If you keep using CloudCare after a change takes effect, the new
+          the top of this page. If a change is important, we will tell you through CloudCare or by email at least 30
+          days before it takes effect, unless the change is needed sooner for legal or safety reasons. If you keep using CloudCare after a change takes effect, the new
           Terms apply. If you do not agree, stop using CloudCare.
         </p>
       </LegalSection>

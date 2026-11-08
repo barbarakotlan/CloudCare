@@ -1,4 +1,4 @@
-import { ChevronDown, FileWarning } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { Swoosh } from "@/components/brand/Swoosh";
 import { SiteFooter } from "@/components/landing/SiteFooter";
@@ -15,17 +15,12 @@ const PROSE = cn(
   "[&_a]:font-bold [&_a]:text-brand-cyan-strong [&_a]:underline [&_a]:decoration-brand-cyan/40 [&_a]:underline-offset-2 [&_a:hover]:decoration-brand-cyan-strong",
 );
 
-/** A value that still has to be filled in before the document is final. */
-export function Placeholder({ children }: { children: ReactNode }) {
-  return (
-    <mark className="rounded-md bg-amber-100 px-1 font-semibold text-amber-900 ring-1 ring-amber-300 [box-decoration-break:clone]">
-      [{children}]
-    </mark>
-  );
-}
-
-/** Marks wording that still needs a lawyer's review before the document is final. */
+/**
+ * Marks wording that still needs a lawyer's review. Shown while developing only;
+ * production pages render nothing.
+ */
 export function CounselNote({ children }: { children: ReactNode }) {
+  if (process.env.NODE_ENV === "production") return null;
   return (
     <p
       role="note"
@@ -36,18 +31,27 @@ export function CounselNote({ children }: { children: ReactNode }) {
   );
 }
 
-export function DraftBanner() {
+/** Dates and status under the page title, as plain label/value lines. */
+export function LegalMeta({ updated, effective }: { updated: string; effective: string }) {
+  // Label and value flow as one line of text, so long values wrap under the label naturally.
+  const label = "inline font-bold text-ink after:content-['_']";
   return (
-    <div
-      role="note"
-      className="flex items-start gap-3 rounded-3xl bg-amber-50 px-5 py-4 text-amber-950 ring-1 ring-amber-300 sm:items-center"
-    >
-      <FileWarning className="mt-0.5 size-6 shrink-0 text-amber-700 sm:mt-0" aria-hidden="true" />
-      <p className="text-[0.98rem] leading-snug">
-        <strong className="font-extrabold">Draft for legal review.</strong> This document has not yet been reviewed by
-        legal counsel and is not final.
-      </p>
-    </div>
+    <dl className="flex flex-col gap-1">
+      <div>
+        <dt className={label}>Last updated:</dt>
+        <dd className="inline">{updated}</dd>
+      </div>
+      <div>
+        <dt className={label}>Effective date:</dt>
+        <dd className="inline">{effective}</dd>
+      </div>
+      <div>
+        <dt className={label}>Status:</dt>
+        <dd className="inline">
+          Draft for legal review. This document has not yet been reviewed by legal counsel and is not final.
+        </dd>
+      </div>
+    </dl>
   );
 }
 
@@ -105,7 +109,7 @@ function TocList({ toc }: { toc: TocEntry[] }) {
   );
 }
 
-/** Shared shell for public legal pages: brand header, draft banner, contents, readable column, footer. */
+/** Shared shell for public legal pages: brand header, title and dates, contents, readable column, footer. */
 export function LegalPage({
   title,
   eyebrow = "Legal",
@@ -126,8 +130,7 @@ export function LegalPage({
       <main id="main" className="flex-1 bg-surface-soft">
         <div className="bg-surface-pale">
           <div className="mx-auto max-w-6xl px-4 pt-10 pb-12 sm:px-6 sm:pt-14 sm:pb-16">
-            <DraftBanner />
-            <p className="mt-10 text-sm font-extrabold tracking-[0.14em] text-brand-cyan-strong uppercase">{eyebrow}</p>
+            <p className="text-sm font-extrabold tracking-[0.14em] text-brand-cyan-strong uppercase">{eyebrow}</p>
             <h1 className="mt-3 text-4xl leading-[1.05] font-black tracking-tight text-balance text-ink sm:text-6xl">{title}</h1>
             <Swoosh className="mt-4 h-4 w-48 sm:w-64" />
             {meta ? <div className="mt-6 flex flex-col gap-1 text-[0.98rem] text-ink-soft">{meta}</div> : null}

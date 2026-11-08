@@ -3,6 +3,7 @@
 from app.models.care_plan import CarePlan, CarePlanChunk
 from app.models.chat_state import ChatSession
 from app.models.epic import EpicConnection, EpicOAuthState
+from app.models.outreach import OutreachLog
 from app.models.reminders import Appointment, Medication, MedicationLog
 from app.models.triage import ChatMessage, Escalation, RiskScore, SymptomLog
 from app.models.user import Patient, User
@@ -14,4 +15,5 @@ __all__ = [
     "SymptomLog", "ChatMessage", "RiskScore", "Escalation",
     "ChatSession",
     "EpicOAuthState", "EpicConnection",
+    "OutreachLog",
 ]

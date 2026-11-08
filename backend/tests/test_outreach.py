@@ -43,6 +43,14 @@ from app.outreach.router import router as outreach_router  # noqa: E402
 
 seed.ensure_supabase_demo_users = lambda db: {}
 
+# Every test seeds a fresh database; hash the demo password once instead of per user
+# (scrypt is deliberately slow). Tests sign in with tokens, not passwords.
+from app import demo_data  # noqa: E402
+
+_DEMO_HASH = auth.hash_password(seed.DEMO_PASSWORD)
+seed.hash_password = lambda password: _DEMO_HASH
+demo_data.hash_password = lambda password: _DEMO_HASH
+
 PHONE = "+15552345678"
 TWILIO_SID = "AC" + "a" * 32
 MESSAGE_SID = "SM" + "b" * 32
@@ -488,6 +496,76 @@ def test_signup_phone_invalid_or_missing_is_ignored():
             user = auth._user_from_supabase(db, _claims(raw))
             patient = db.scalar(select(Patient).where(Patient.user_id == user.id))
             assert patient is not None and patient.phone is None, raw
+
+
+# ---- the full app: PATCH /patients/me, phone on PatientOut, router mounted ----------
+
+def _setup_main(phone: str | None = None):
+    """Same database, served by the real app (all routers)."""
+    from app.main import app
+
+    _, TestSession, ctx = _setup(phone=phone)
+    engine_session = TestSession
+
+    def override_get_db():
+        db = engine_session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    # No `with` block: skips the app's startup seed so this test owns the database.
+    return TestClient(app), TestSession, ctx
+
+
+def test_patient_sets_and_clears_own_phone():
+    client, TestSession, ctx = _setup_main(phone=None)
+    assert client.get("/patients/me", headers=ctx["patient"]).json()["phone"] is None
+
+    res = client.patch("/patients/me", headers=ctx["patient"], json={"phone": "(555) 234-5678"})
+    assert res.status_code == 200, res.text
+    assert res.json()["phone"] == PHONE and res.json()["full_name"] == "Jordan Lee"
+    assert client.get("/patients/me", headers=ctx["patient"]).json()["phone"] == PHONE
+
+    # Sending nothing changes nothing; null clears.
+    assert client.patch("/patients/me", headers=ctx["patient"], json={}).json()["phone"] == PHONE
+    assert client.patch("/patients/me", headers=ctx["patient"], json={"phone": None}).json()["phone"] is None
+    with TestSession() as db:
+        assert db.get(Patient, ctx["patient_id"]).phone is None
+
+
+def test_patient_phone_rejects_service_numbers():
+    client, _, ctx = _setup_main(phone=PHONE)
+    for raw in ("911", "+1 911 555 1234", "411-555-1234", "12345", "x" * 40):
+        res = client.patch("/patients/me", headers=ctx["patient"], json={"phone": raw})
+        assert res.status_code == 422, (raw, res.text)
+    assert client.get("/patients/me", headers=ctx["patient"]).json()["phone"] == PHONE
+    detail = client.patch("/patients/me", headers=ctx["patient"], json={"phone": "911"}).json()["detail"]
+    assert detail == "That number can't be used. Enter your own mobile number."
+
+
+def test_patch_me_is_patient_only():
+    client, _, ctx = _setup_main()
+    assert client.patch("/patients/me", headers=ctx["clinician"], json={"phone": PHONE}).status_code == 403
+    assert client.patch("/patients/me", json={"phone": PHONE}).status_code == 401
+
+
+def test_clinician_sees_and_edits_phone():
+    client, _, ctx = _setup_main(phone=PHONE)
+    url = f"/patients/{ctx['patient_id']}"
+    assert client.get(url, headers=ctx["clinician"]).json()["phone"] == PHONE
+    res = client.patch(url, headers=ctx["clinician"], json={"phone": "555.876.5432"})
+    assert res.status_code == 200 and res.json()["phone"] == "+15558765432"
+    assert client.patch(url, headers=ctx["clinician"], json={"phone": "911"}).status_code == 422
+    assert client.patch(url, headers=ctx["clinician"], json={"phone": ""}).json()["phone"] is None
+
+
+def test_outreach_router_is_mounted():
+    client, _, ctx = _setup_main(phone=PHONE)
+    res = client.get("/outreach/capabilities", headers=ctx["patient"])
+    assert res.status_code == 200, res.text
+    assert res.json()["phone_last4"] == "5678"
 
 
 if __name__ == "__main__":

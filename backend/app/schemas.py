@@ -40,6 +40,8 @@ class PatientOut(ORM):
     surgery_date: date
     discharge_date: date | None
     comorbidities: list[str]
+    # Mobile number in E.164 (e.g. +15551234567), or null when none is on file.
+    phone: str | None = None
 
 
 class PatientUpdate(BaseModel):
@@ -51,6 +53,14 @@ class PatientUpdate(BaseModel):
     discharge_date: date | None = None
     date_of_birth: date | None = None
     comorbidities: list[str] | None = None
+    # Any common format; stored as E.164. Null or "" clears it.
+    phone: str | None = Field(default=None, max_length=32)
+
+
+class PatientMeUpdate(BaseModel):
+    """A patient edits their own profile. Only the mobile number for now."""
+    # Any common format; stored as E.164. Null or "" clears it.
+    phone: str | None = Field(default=None, max_length=32)
 
 
 class CarePlanIn(BaseModel):

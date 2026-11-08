@@ -69,3 +69,26 @@ services:
         sync: false
       - key: EPIC_SANDBOX
         value: "true"
+      # Texts and calls to the patient's own phone (docs/phone-outreach.md). Without
+      # these, /outreach reports "not set up". Apply database/patient_phone.sql first.
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      # The purchased Twilio number, E.164.
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      # Optional Messaging Service SID (MG...), used instead of the From number.
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
+      # Server-only ElevenLabs key restricted to Agents.
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_AGENT_ID
+        sync: false
+      # ElevenLabs -> Agents -> Phone Numbers -> the imported number's id.
+      - key: ELEVENLABS_PHONE_NUMBER_ID
+        sync: false
+      # Link put in texts.
+      - key: PUBLIC_APP_URL
+        value: https://cloudcare.icu

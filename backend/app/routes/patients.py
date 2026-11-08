@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_patient, get_patient_for_clinician, require_clinician
 from app.database import get_db
 from app.models import CarePlan, CarePlanChunk, Escalation, Patient, RiskScore, SymptomLog, User
-from app.schemas import CarePlanIn, CarePlanOut, PatientOut, PatientRow, PatientUpdate, RiskOut
+from app.outreach.phone import PhoneError, normalize_e164
+from app.schemas import CarePlanIn, CarePlanOut, PatientMeUpdate, PatientOut, PatientRow, PatientUpdate, RiskOut
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -17,7 +18,24 @@ def to_patient_out(p: Patient) -> PatientOut:
         id=p.id, full_name=p.user.full_name, procedure_name=p.procedure_name,
         procedure_type=p.procedure_type, surgery_date=p.surgery_date,
         discharge_date=p.discharge_date, comorbidities=p.comorbidities,
+        phone=p.phone,
     )
+
+
+def apply_phone(patient: Patient, raw: str | None) -> None:
+    """Sets or clears the mobile number. 422 with a readable message when it can't be used
+    (including 911 and other service numbers). A changed number is no longer verified."""
+    if raw is None or not raw.strip():
+        patient.phone = None
+        patient.phone_verified_at = None
+        return
+    try:
+        phone = normalize_e164(raw)
+    except PhoneError as exc:
+        raise HTTPException(422, str(exc))
+    if phone != patient.phone:
+        patient.phone = phone
+        patient.phone_verified_at = None
 
 
 @router.get("", response_model=list[PatientRow])
@@ -44,6 +62,20 @@ def list_my_patients(db: Session = Depends(get_db), clinician: User = Depends(re
 
 @router.get("/me", response_model=PatientOut)
 def my_profile(patient: Patient = Depends(get_current_patient)):
+    return to_patient_out(patient)
+
+
+@router.patch("/me", response_model=PatientOut)
+def update_my_profile(
+    body: PatientMeUpdate,
+    db: Session = Depends(get_db),
+    patient: Patient = Depends(get_current_patient),
+):
+    """Patient sets or clears their own mobile number (used for texts and calls from Foggy)."""
+    if "phone" in body.model_dump(exclude_unset=True):
+        apply_phone(patient, body.phone)
+        db.commit()
+        db.refresh(patient)
     return to_patient_out(patient)
 
 
@@ -90,6 +122,8 @@ def update_patient(
             if item and item.lower() not in (c.lower() for c in cleaned):
                 cleaned.append(item)
         patient.comorbidities = cleaned
+    if "phone" in changes:
+        apply_phone(patient, changes["phone"])
 
     if patient.discharge_date and patient.discharge_date < patient.surgery_date:
         db.rollback()

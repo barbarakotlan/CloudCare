@@ -60,10 +60,16 @@ class OutreachSettings:
     # Outbound calls: Twilio answering-machine detection on/off, and ring time in seconds.
     machine_detection: bool = True
     ringing_timeout_secs: int = DEFAULT_RINGING_TIMEOUT_SECS
-    # Numbers (E.164) the shared public demo accounts may text or call. Empty = none.
+    # Numbers (E.164) the shared public demo accounts may text or call.
+    # demo_open=True (OUTREACH_DEMO_ALLOWLIST unset or "*") means any usable number.
     demo_allowlist: tuple[str, ...] = ()
+    demo_open: bool = True
 
     def demo_number_allowed(self, e164: str | None) -> bool:
+        return bool(e164) and (self.demo_open or e164 in self.demo_allowlist)
+
+    def demo_number_listed(self, e164: str | None) -> bool:
+        """Explicitly listed team numbers (never true for the wildcard)."""
         return bool(e164) and e164 in self.demo_allowlist
 
     @property
@@ -121,7 +127,17 @@ def get_settings() -> OutreachSettings:
         ringing_timeout_secs=_env_int("OUTREACH_RINGING_TIMEOUT_SECS", DEFAULT_RINGING_TIMEOUT_SECS,
                                       *RINGING_TIMEOUT_RANGE),
         demo_allowlist=_demo_allowlist(),
+        demo_open=_demo_open(),
     )
+
+
+def _demo_open() -> bool:
+    """OUTREACH_DEMO_ALLOWLIST unset or "*" lets demo accounts call any usable number.
+
+    "none" (or an explicit list) restricts them; "none" alone blocks them entirely.
+    """
+    raw = _env("OUTREACH_DEMO_ALLOWLIST").strip()
+    return raw == "" or raw == "*"
 
 
 def _demo_allowlist() -> tuple[str, ...]:
@@ -130,7 +146,7 @@ def _demo_allowlist() -> tuple[str, ...]:
 
     out: list[str] = []
     for raw in _env("OUTREACH_DEMO_ALLOWLIST").split(","):
-        if not raw.strip():
+        if not raw.strip() or raw.strip() in ("*", "none"):
             continue
         try:
             out.append(normalize_e164(raw))

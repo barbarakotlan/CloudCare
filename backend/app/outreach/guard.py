@@ -4,13 +4,16 @@ The destination is always the patient's own stored number, but a patient (or any
 holding the public demo login) can change that number. Without extra limits the
 "Call me" button could be pointed at a stranger's phone. These checks bound that:
 
-- New-number cooldown: no text or call within OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS
-  (default 10 minutes) of the number being set or changed, so numbers can't be cycled.
+- New-number cooldown: no text or call within OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS of the
+  number being set or changed, so numbers can't be cycled. Off by default (0) so that a
+  live demo can call any number an attendee types in; set 600 for a hardened deployment.
 - Per-destination daily cap: at most OUTREACH_MAX_PER_NUMBER_PER_DAY texts and the same
   number of calls (default 6 each) to one phone number, across every account.
 - Per-patient daily cap: at most OUTREACH_MAX_PER_PATIENT_PER_DAY per channel
-  (default 10), counted from the outreach_log table.
+  (default 40), counted from the outreach_log table.
 - Server-wide hourly cap on calls: OUTREACH_MAX_CALLS_PER_HOUR (default 30) bounds cost.
+- Numbers listed explicitly in OUTREACH_DEMO_ALLOWLIST (the team's own phones) skip the
+  cooldown and the daily caps; see router._abuse_checks.
 
 The first, second and fourth are in memory (one Render process; they reset on restart).
 Residual risk and the longer-term fix (verifying the number with a one-time code) are
@@ -38,11 +41,11 @@ def _env_int(name: str, default: int, lo: int, hi: int) -> int:
 
 
 def new_number_cooldown_seconds() -> int:
-    return _env_int("OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS", 600, 0, DAY)
+    return _env_int("OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS", 0, 0, DAY)
 
 
 def max_per_patient_per_day() -> int:
-    return _env_int("OUTREACH_MAX_PER_PATIENT_PER_DAY", 10, 1, 1000)
+    return _env_int("OUTREACH_MAX_PER_PATIENT_PER_DAY", 40, 1, 1000)
 
 
 _lock = threading.Lock()

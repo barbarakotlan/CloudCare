@@ -426,6 +426,9 @@ def test_new_number_cooldown_blocks_calls_and_texts():
     client, _, ctx = _setup()
     _outreach_env()
     _mock_providers()
+    # Cooldown is opt-in; demo accounts open to any number so nothing here is a listed team phone.
+    os.environ["OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS"] = "600"
+    os.environ["OUTREACH_DEMO_ALLOWLIST"] = "*"
     try:
         res = client.patch("/patients/me", headers=ctx["jordan"], json={"phone": "(555) 234-9876"})
         assert res.status_code == 200, res.text
@@ -441,6 +444,22 @@ def test_new_number_cooldown_blocks_calls_and_texts():
                             json={"phone": "555-234-1111"}).status_code == 200
         assert guard.new_number_wait(ctx["jordan_id"]) > 500
     finally:
+        os.environ.pop("OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS", None)
+        _outreach_env(False)
+        outreach_config.set_transport(None)
+
+
+def test_cooldown_is_off_by_default():
+    client, _, ctx = _setup()
+    _outreach_env()
+    _mock_providers()
+    os.environ.pop("OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS", None)
+    os.environ["OUTREACH_DEMO_ALLOWLIST"] = "*"
+    try:
+        assert client.patch("/patients/me", headers=ctx["jordan"], json={"phone": "(555) 234-9876"}).status_code == 200
+        assert guard.new_number_wait(ctx["jordan_id"]) == 0
+        assert client.post("/outreach/call", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 200
+    finally:
         _outreach_env(False)
         outreach_config.set_transport(None)
 
@@ -448,36 +467,67 @@ def test_new_number_cooldown_blocks_calls_and_texts():
 def test_signup_number_starts_the_cooldown():
     _setup()
     _enable_supabase()
+    os.environ["OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS"] = "600"
     token = jwt.encode(_claims(email="signup@example.com", user_metadata={"full_name": "Sam", "phone": "555-222-3333"}),
                        PRIVATE_KEY, algorithm="ES256", headers={"kid": KID})
     from app.main import app
     client = TestClient(app, raise_server_exceptions=False)
     assert client.get("/patients/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
     pid = uuid.UUID(client.get("/patients/me", headers={"Authorization": f"Bearer {token}"}).json()["id"])
-    assert guard.new_number_wait(pid) > 500
+    try:
+        assert guard.new_number_wait(pid) > 500
+    finally:
+        os.environ.pop("OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS", None)
 
 
 def test_per_patient_and_per_number_daily_caps():
+    # A regular account calling a number that is not on the team allowlist.
     client, TestSession, ctx = _setup()
     _outreach_env()
     _mock_providers()
+    other = "+15553334444"
     try:
         with TestSession() as db:
-            p = db.get(Patient, ctx["jordan_id"])
-            p.phone = PHONE
+            p = db.get(Patient, ctx["b_id"])
+            p.phone = other
             # Ten earlier texts today (older than the 60 s interval).
             for i in range(guard.max_per_patient_per_day()):
-                db.add(OutreachLog(patient_id=p.id, kind="checkin", channel="sms", to_number_last4="5678",
+                db.add(OutreachLog(patient_id=p.id, kind="checkin", channel="sms", to_number_last4="4444",
                                    status="sent", created_at=datetime.now(timezone.utc) - timedelta(hours=1, minutes=i)))
             db.commit()
-        res = client.post("/outreach/sms", headers=ctx["jordan"], json={"kind": "checkin"})
+        res = client.post("/outreach/sms", headers=ctx["b"], json={"kind": "checkin"})
         assert res.status_code == 429 and "today's limit" in res.json()["detail"]
         # Same number, any account: the per-destination cap holds across accounts.
         for _ in range(guard._per_number.limit):
-            guard.count_attempt("call", PHONE)
-        res = client.post("/outreach/call", headers=ctx["jordan"], json={"kind": "checkin"})
+            guard.count_attempt("call", other)
+        res = client.post("/outreach/call", headers=ctx["b"], json={"kind": "checkin"})
         assert res.status_code == 429 and "today's limit" in res.json()["detail"]
     finally:
+        _outreach_env(False)
+        outreach_config.set_transport(None)
+
+
+def test_allowlisted_numbers_skip_cooldown_and_daily_caps():
+    # Team phones on OUTREACH_DEMO_ALLOWLIST are called many times during rehearsals and demos.
+    client, TestSession, ctx = _setup()
+    _outreach_env()
+    _mock_providers()
+    os.environ["OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS"] = "600"
+    try:
+        # Setting the number just now would normally start the 10-minute wait.
+        assert client.patch("/patients/me", headers=ctx["jordan"], json={"phone": PHONE}).status_code == 200
+        assert guard.new_number_wait(ctx["jordan_id"]) > 500
+        assert client.post("/outreach/call", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 200
+        with TestSession() as db:
+            for i in range(guard.max_per_patient_per_day()):
+                db.add(OutreachLog(patient_id=ctx["jordan_id"], kind="checkin", channel="sms", to_number_last4="5678",
+                                   status="sent", created_at=datetime.now(timezone.utc) - timedelta(hours=1, minutes=i)))
+            db.commit()
+        for _ in range(guard._per_number.limit):
+            guard.count_attempt("sms", PHONE)
+        assert client.post("/outreach/sms", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 200
+    finally:
+        os.environ.pop("OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS", None)
         _outreach_env(False)
         outreach_config.set_transport(None)
 
@@ -505,10 +555,24 @@ def test_demo_account_only_reaches_allowlisted_numbers():
         assert caps["call"] is True and "call" not in caps["reasons"]
         assert client.post("/outreach/call", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 200
 
-        # Empty allowlist: demo accounts can't text or call at all.
-        os.environ["OUTREACH_DEMO_ALLOWLIST"] = ""
+        # "none": demo accounts can't text or call at all.
+        os.environ["OUTREACH_DEMO_ALLOWLIST"] = "none"
         assert client.get("/outreach/capabilities", headers=ctx["jordan"]).json()["call"] is False
         assert client.post("/outreach/sms", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 403
+
+        # Unset or "*": open, any usable number (the demo-day default).
+        for value in (None, "*"):
+            if value is None:
+                os.environ.pop("OUTREACH_DEMO_ALLOWLIST", None)
+            else:
+                os.environ["OUTREACH_DEMO_ALLOWLIST"] = value
+            with TestSession() as db:
+                db.get(Patient, ctx["jordan_id"]).phone = "+15553334444"
+                db.commit()
+            assert client.get("/outreach/capabilities", headers=ctx["jordan"]).json()["call"] is True, value
+        # (a call to Jordan went out moments ago, so the 60 s per-channel interval applies; text instead)
+        assert client.post("/outreach/sms", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 200
+        os.environ["OUTREACH_DEMO_ALLOWLIST"] = OUTREACH_ENV["OUTREACH_DEMO_ALLOWLIST"]
 
         # A regular (non-demo) patient isn't bound by the allowlist.
         caps_b = client.get("/outreach/capabilities", headers=ctx["b"]).json()

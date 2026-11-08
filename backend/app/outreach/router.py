@@ -78,21 +78,29 @@ def _too_soon(response_detail: str, wait: int) -> HTTPException:
     )
 
 
-NEW_NUMBER = "Your mobile number was just changed. For your safety, texts and calls to a new number start 10 minutes after the change."
+NEW_NUMBER = "Your mobile number was just changed. For your safety, texts and calls to a new number start {minutes} minutes after the change."
 DAILY_LIMIT = "You've reached today's limit for this. Try again tomorrow, or use the check-in on your dashboard."
 BUSY = "Calls are busy right now."
 
 
-def _abuse_checks(db: Session, patient: Patient, channel: str, to_number: str) -> None:
-    """Limits that stop the button being used against someone else's phone (guard.py)."""
-    wait = guard.new_number_wait(patient.id)
-    if wait:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, NEW_NUMBER, headers={"Retry-After": str(wait)})
-    if outreach_log.count_since(db, patient.id, channel, guard.DAY) >= guard.max_per_patient_per_day():
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, DAILY_LIMIT, headers={"Retry-After": "3600"})
-    wait = guard.number_wait(channel, to_number)
-    if wait:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, DAILY_LIMIT, headers={"Retry-After": str(wait)})
+def _abuse_checks(db: Session, patient: Patient, channel: str, to_number: str, settings: OutreachSettings) -> None:
+    """Limits that stop the button being used against someone else's phone (guard.py).
+
+    Numbers listed explicitly in OUTREACH_DEMO_ALLOWLIST belong to the team, so they skip
+    the new-number wait and the daily caps (rehearsals and live demos call the same phones
+    many times). The server-wide hourly cap still applies to them.
+    """
+    if not settings.demo_number_listed(to_number):
+        wait = guard.new_number_wait(patient.id)
+        if wait:
+            minutes = max(1, round(guard.new_number_cooldown_seconds() / 60))
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, NEW_NUMBER.format(minutes=minutes),
+                                headers={"Retry-After": str(wait)})
+        if outreach_log.count_since(db, patient.id, channel, guard.DAY) >= guard.max_per_patient_per_day():
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, DAILY_LIMIT, headers={"Retry-After": "3600"})
+        wait = guard.number_wait(channel, to_number)
+        if wait:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, DAILY_LIMIT, headers={"Retry-After": str(wait)})
     if channel == "call":
         wait = guard.global_call_wait()
         if wait:
@@ -149,7 +157,7 @@ def send_text(body: SmsIn, patient: Patient = Depends(get_current_patient), db: 
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, SMS_NOT_CONFIGURED)
     to_number = _destination(patient, settings)
     to_last4 = last4(to_number)
-    _abuse_checks(db, patient, "sms", to_number)
+    _abuse_checks(db, patient, "sms", to_number, settings)
 
     wait = outreach_log.reserve(db, patient.id, "sms", SMS_INTERVAL_SECONDS)
     if wait:
@@ -206,7 +214,7 @@ def start_call(body: CallIn, patient: Patient = Depends(get_current_patient), db
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, CALL_NOT_CONFIGURED)
     to_number = _destination(patient, settings)
     to_last4 = last4(to_number)
-    _abuse_checks(db, patient, "call", to_number)
+    _abuse_checks(db, patient, "call", to_number, settings)
 
     wait = outreach_log.reserve(db, patient.id, "call", CALL_INTERVAL_SECONDS)
     if wait:

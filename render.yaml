@@ -89,6 +89,14 @@ services:
       # ElevenLabs -> Agents -> Phone Numbers -> the imported number's id.
       - key: ELEVENLABS_PHONE_NUMBER_ID
         sync: false
+      # Who the shared demo accounts may call or text: unset or "*" = any number
+      # (demo day), a comma-separated list = only those numbers, "none" = nobody.
+      - key: OUTREACH_DEMO_ALLOWLIST
+        sync: false
+      # Seconds to wait after a phone number is set before it can be called.
+      # 0 for a live demo where attendees enter their own numbers; 600 to harden.
+      - key: OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS
+        value: "0"
       # Link put in texts.
       - key: PUBLIC_APP_URL
         value: https://cloudcare.icu

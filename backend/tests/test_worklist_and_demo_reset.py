@@ -28,8 +28,8 @@ from app import auth, seed  # noqa: E402
 from app import models  # noqa: E402,F401
 from app.database import Base, get_db  # noqa: E402
 from app.models import (  # noqa: E402
-    Appointment, CarePlan, CarePlanChunk, ChatMessage, ChatSession, Escalation, Medication, MedicationLog,
-    OutreachLog, Patient, RiskScore, SymptomLog, User,
+    Appointment, CarePlan, CarePlanChunk, ChatMessage, ChatSession, EpicConnection, Escalation, Medication,
+    MedicationLog, OutreachLog, Patient, RiskScore, SymptomLog, User,
 )
 from app.routes.patients import _worklist_order  # noqa: E402
 from app.schemas import PatientRow, RiskOut  # noqa: E402
@@ -304,6 +304,13 @@ def test_reset_as_clinician_clears_only_demo_patient_activity():
     other_id = uuid.UUID(_new_patient(TestSession, ctx["clinician_id"], email="keep@example.com"))
     _fill_activity(TestSession, jordan)
     _fill_activity(TestSession, other_id)
+    # A presenter may save their phone and link MyChart, then sign in again (which resets).
+    with TestSession() as db:
+        p = db.get(Patient, jordan)
+        p.phone = "+15551234567"
+        db.add(EpicConnection(user_id=p.user_id, iss="https://fhir.example/R4", patient_fhir_id="abc",
+                              access_token_enc="enc", connected_at=datetime.now(timezone.utc)))
+        db.commit()
     with TestSession() as db:
         keep = {
             "plans": _count(db, CarePlan, CarePlan.patient_id == jordan),
@@ -353,7 +360,11 @@ def test_reset_as_clinician_clears_only_demo_patient_activity():
             "chat": _count(db, ChatMessage, ChatMessage.patient_id == other_id),
             "out": _count(db, OutreachLog, OutreachLog.patient_id == other_id),
         }
-        assert db.get(Patient, jordan) is not None
+        jordan_row = db.get(Patient, jordan)
+        assert jordan_row is not None
+        # The stored phone and the MyChart link survive a reset.
+        assert jordan_row.phone == "+15551234567"
+        assert _count(db, EpicConnection, EpicConnection.user_id == jordan_row.user_id) == 1
 
     # The worklist still works and the demo patient has a fresh low risk, no open alerts.
     row = next(r for r in client.get("/patients", headers=ctx["clinician"]).json() if r["id"] == str(jordan))

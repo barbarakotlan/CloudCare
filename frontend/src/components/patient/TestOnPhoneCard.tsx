@@ -254,6 +254,8 @@ export function TestOnPhoneCard() {
     return null;
   }
 
+  // Texting is only offered when the server can really send texts; otherwise check-ins stay in the app.
+  const showText = capabilities?.sms === true;
   const smsBlocked = blockedReason("sms");
   const callBlocked = blockedReason("call");
 
@@ -263,7 +265,7 @@ export function TestOnPhoneCard() {
         id={`${ids}-title`}
         icon={<Smartphone className="size-5" aria-hidden="true" />}
         title="Test on my phone"
-        description="Check in here, or have Foggy text or call you."
+        description={showText ? "Check in here, or have Foggy text or call you." : "Check in here, or have Foggy call you."}
       />
 
       {/* Number on file */}
@@ -343,7 +345,7 @@ export function TestOnPhoneCard() {
       {notSetUp ? (
         <p className="mt-4 flex items-start gap-2 text-sm text-ink-soft">
           <Info className="mt-0.5 size-4 shrink-0 text-brand-cyan-strong" aria-hidden="true" />
-          Texts and calls from Foggy aren&rsquo;t set up on this server yet. You can still check in here.
+          Calls from Foggy aren&rsquo;t set up on this server yet. You can still check in here.
         </p>
       ) : null}
       {caps.error ? (
@@ -357,7 +359,7 @@ export function TestOnPhoneCard() {
       ) : null}
 
       {/* Actions */}
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className={cn("mt-5 grid gap-3", showText ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
         <ActionButton
           icon={<ClipboardCheck className="size-5" aria-hidden="true" />}
           label="Check in here"
@@ -365,16 +367,18 @@ export function TestOnPhoneCard() {
           onClick={checkInHere}
           variant="primary"
         />
-        <ActionButton
-          icon={<MessageSquareText className="size-5" aria-hidden="true" />}
-          label={text.phase === "busy" ? "Sending…" : "Text me"}
-          busy={text.phase === "busy"}
-          hint={smsBlocked ?? "A text with a link to your check-in."}
-          disabled={Boolean(smsBlocked) || text.phase === "busy"}
-          onClick={() => void onTextMe()}
-          describedBy={`${ids}-sms-hint`}
-          hintId={`${ids}-sms-hint`}
-        />
+        {showText ? (
+          <ActionButton
+            icon={<MessageSquareText className="size-5" aria-hidden="true" />}
+            label={text.phase === "busy" ? "Sending…" : "Text me"}
+            busy={text.phase === "busy"}
+            hint={smsBlocked ?? "A text with a link to your check-in."}
+            disabled={Boolean(smsBlocked) || text.phase === "busy"}
+            onClick={() => void onTextMe()}
+            describedBy={`${ids}-sms-hint`}
+            hintId={`${ids}-sms-hint`}
+          />
+        ) : null}
         <ActionButton
           icon={<PhoneCall className="size-5" aria-hidden="true" />}
           label={call.phase === "busy" ? "Calling…" : "Call me"}
@@ -393,7 +397,7 @@ export function TestOnPhoneCard() {
       </div>
 
       <p className="mt-4 text-xs text-brand-gray">
-        Foggy only texts or calls the number on your account. Foggy can&rsquo;t place emergency calls: for chest pain
+        {showText ? "Foggy only texts or calls the number on your account." : "Foggy only calls the number on your account."} Foggy can&rsquo;t place emergency calls: for chest pain
         or trouble breathing, call 911.
       </p>
     </Card>

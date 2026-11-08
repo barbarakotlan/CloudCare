@@ -1,0 +1,194 @@
+[
+  {
+    "start": 0.12,
+    "end": 0.78,
+    "speaker": "Foggy",
+    "text": "Hi, Alex."
+  },
+  {
+    "start": 1.06,
+    "end": 4.04,
+    "speaker": "Foggy",
+    "text": "I'm Foggy, your AI recovery companion from CloudCare."
+  },
+  {
+    "start": 4.52,
+    "end": 6.36,
+    "speaker": "Foggy",
+    "text": "I'm checking in on behalf of your care team."
+  },
+  {
+    "start": 6.82,
+    "end": 8.26,
+    "speaker": "Foggy",
+    "text": "How are you feeling since getting home?"
+  },
+  {
+    "start": 9.5,
+    "end": 12.72,
+    "speaker": "Patient",
+    "text": "A little tired, and my shoulder is starting to hurt more."
+  },
+  {
+    "start": 13.16,
+    "end": 18.48,
+    "speaker": "Foggy",
+    "text": "On a scale of 1 to 10, with 10 being the worst pain you can imagine, how would you rate it?"
+  },
+  {
+    "start": 18.92,
+    "end": 19.78,
+    "speaker": "Patient",
+    "text": "About a six."
+  },
+  {
+    "start": 20.22,
+    "end": 23.44,
+    "speaker": "Foggy",
+    "text": "Has that improved, stayed the same, or gotten worse?"
+  },
+  {
+    "start": 23.9,
+    "end": 24.32,
+    "speaker": "Patient",
+    "text": "Worse."
+  },
+  {
+    "start": 24.8,
+    "end": 26.26,
+    "speaker": "Patient",
+    "text": "It was about a three earlier."
+  },
+  {
+    "start": 26.64,
+    "end": 30.22,
+    "speaker": "Foggy",
+    "text": "Have you been able to follow the pain medication instructions your care team gave you?"
+  },
+  {
+    "start": 30.62,
+    "end": 32.18,
+    "speaker": "Patient",
+    "text": "I'm confused about the schedule."
+  },
+  {
+    "start": 32.66,
+    "end": 34.46,
+    "speaker": "Patient",
+    "text": "I don't remember when I last took anything."
+  },
+  {
+    "start": 34.78,
+    "end": 35.6,
+    "speaker": "Foggy",
+    "text": "Thanks for telling me."
+  },
+  {
+    "start": 36.12,
+    "end": 39.72,
+    "speaker": "Foggy",
+    "text": "Are you having trouble breathing, chest pain, or any other new symptoms?"
+  },
+  {
+    "start": 40.14,
+    "end": 41.6,
+    "speaker": "Patient",
+    "text": "No, just the shoulder pain."
+  },
+  {
+    "start": 42,
+    "end": 47.9,
+    "speaker": "Foggy",
+    "text": "Because your pain is increasing and your medication timing is unclear, I'm flagging this for your care team to review."
+  },
+  {
+    "start": 48.48,
+    "end": 53.8,
+    "speaker": "Foggy",
+    "text": "Please contact them using the on-call number in your discharge instructions so they can clarify your next steps."
+  },
+  {
+    "start": 54.22,
+    "end": 55.38,
+    "speaker": "Patient",
+    "text": "Can you tell them what's happening?"
+  },
+  {
+    "start": 55.8,
+    "end": 56.1,
+    "speaker": "Foggy",
+    "text": "Yes."
+  },
+  {
+    "start": 56.6,
+    "end": 63.66,
+    "speaker": "Foggy",
+    "text": "Your report includes pain increasing from three to six, uncertainty about your last medication dose, and no other symptoms reported."
+  },
+  {
+    "start": 64.2,
+    "end": 65.56,
+    "speaker": "Foggy",
+    "text": "It will appear in their review queue."
+  },
+  {
+    "start": 65.86,
+    "end": 67.08,
+    "speaker": "Foggy",
+    "text": "It hasn't been acknowledged yet."
+  },
+  {
+    "start": 67.46,
+    "end": 68.84,
+    "speaker": "Patient",
+    "text": "Can you share that with Sam too?"
+  },
+  {
+    "start": 69.22,
+    "end": 72.7,
+    "speaker": "Foggy",
+    "text": "Just confirming, is this the Sam listed as your emergency contact?"
+  },
+  {
+    "start": 73.2,
+    "end": 75.42,
+    "speaker": "Foggy",
+    "text": "If so, I'll go ahead and share it with your permission."
+  },
+  {
+    "start": 75.8,
+    "end": 76.68,
+    "speaker": "Patient",
+    "text": "Yes, please do."
+  },
+  {
+    "start": 77.06,
+    "end": 77.36,
+    "speaker": "Foggy",
+    "text": "Shared."
+  },
+  {
+    "start": 77.78,
+    "end": 79.14,
+    "speaker": "Foggy",
+    "text": "Is there anything else you need, Alex?"
+  },
+  {
+    "start": 79.52,
+    "end": 80.02,
+    "speaker": "Patient",
+    "text": "I'm all set."
+  },
+  {
+    "start": 80.42,
+    "end": 81.34,
+    "speaker": "Foggy",
+    "text": "I hope you feel better."
+  },
+  {
+    "start": 81.72,
+    "end": 82.16,
+    "speaker": "Foggy",
+    "text": "Take care."
+  }
+]

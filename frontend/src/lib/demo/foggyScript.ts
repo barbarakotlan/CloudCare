@@ -50,7 +50,7 @@ export const LANDING_SCRIPT: ScriptStep[] = [
 // ---------------------------------------------------------------------------
 
 export const DEMO_WELCOME =
-  "Hi Jordan, I'm Foggy, an AI recovery helper. I answer from the care plan Dr. Patel wrote for your knee replacement.";
+  "Hi Jordan, I'm Foggy, an AI recovery helper. I answer from the care plan your care team wrote for your knee replacement.";
 
 export const DEMO_SUGGESTIONS = [
   "When can I shower?",

@@ -1,194 +1,248 @@
 [
   {
-    "start": 0.12,
-    "end": 0.78,
+    "start": 0.14,
+    "end": 0.68,
     "speaker": "Foggy",
-    "text": "Hi, Alex."
+    "text": "Hi, Jordan."
   },
   {
-    "start": 1.06,
-    "end": 4.04,
+    "start": 0.98,
+    "end": 4.1,
     "speaker": "Foggy",
-    "text": "I'm Foggy, your AI recovery companion from CloudCare."
+    "text": "This is Foggy from your care team calling for your recovery check-in."
   },
   {
-    "start": 4.52,
-    "end": 6.36,
+    "start": 4.66,
+    "end": 5.62,
     "speaker": "Foggy",
-    "text": "I'm checking in on behalf of your care team."
+    "text": "Is now a good time?"
   },
   {
-    "start": 6.82,
-    "end": 8.26,
-    "speaker": "Foggy",
-    "text": "How are you feeling since getting home?"
-  },
-  {
-    "start": 9.5,
-    "end": 12.72,
+    "start": 6.08,
+    "end": 7.14,
     "speaker": "Patient",
-    "text": "A little tired, and my shoulder is starting to hurt more."
+    "text": "Yeah, now's fine."
   },
   {
-    "start": 13.16,
-    "end": 18.48,
-    "speaker": "Foggy",
-    "text": "On a scale of 1 to 10, with 10 being the worst pain you can imagine, how would you rate it?"
-  },
-  {
-    "start": 18.92,
-    "end": 19.78,
+    "start": 7.7,
+    "end": 8.9,
     "speaker": "Patient",
-    "text": "About a six."
+    "text": "Just got settled on the couch."
   },
   {
-    "start": 20.22,
-    "end": 23.44,
+    "start": 9.34,
+    "end": 9.84,
     "speaker": "Foggy",
-    "text": "Has that improved, stayed the same, or gotten worse?"
+    "text": "Perfect."
   },
   {
-    "start": 23.9,
-    "end": 24.32,
+    "start": 10.44,
+    "end": 13.08,
+    "speaker": "Foggy",
+    "text": "On a scale from 0 to 10, how's your pain right now?"
+  },
+  {
+    "start": 13.5,
+    "end": 14.66,
     "speaker": "Patient",
-    "text": "Worse."
+    "text": "Probably a 4."
+  },
+  {
+    "start": 15.12,
+    "end": 16.94,
+    "speaker": "Patient",
+    "text": "It was worse this morning before I iced it."
+  },
+  {
+    "start": 17.3,
+    "end": 18.54,
+    "speaker": "Foggy",
+    "text": "Okay, a 4."
+  },
+  {
+    "start": 19.06,
+    "end": 22.6,
+    "speaker": "Foggy",
+    "text": "Did you take your acetaminophen, the 1,000 milligrams, at 6:00 this morning?"
+  },
+  {
+    "start": 23,
+    "end": 24.48,
+    "speaker": "Patient",
+    "text": "Yeah, took that one with breakfast."
   },
   {
     "start": 24.8,
-    "end": 26.26,
+    "end": 25.02,
+    "speaker": "Foggy",
+    "text": "Good."
+  },
+  {
+    "start": 25.5,
+    "end": 26.98,
+    "speaker": "Foggy",
+    "text": "And your aspirin at 8:00?"
+  },
+  {
+    "start": 27.1,
+    "end": 29.34,
     "speaker": "Patient",
-    "text": "It was about a three earlier."
+    "text": "Ah, no, I forgot the aspirin."
   },
   {
-    "start": 26.64,
-    "end": 30.22,
+    "start": 29.66,
+    "end": 30.06,
     "speaker": "Foggy",
-    "text": "Have you been able to follow the pain medication instructions your care team gave you?"
+    "text": "Don't worry."
   },
   {
-    "start": 30.62,
-    "end": 32.18,
+    "start": 30.3,
+    "end": 31.74,
+    "speaker": "Foggy",
+    "text": "Go ahead and take it after this call."
+  },
+  {
+    "start": 32.18,
+    "end": 33.36,
+    "speaker": "Foggy",
+    "text": "I put it as missed for now."
+  },
+  {
+    "start": 33.58,
+    "end": 34.86,
+    "speaker": "Foggy",
+    "text": "You can change it when you do take it."
+  },
+  {
+    "start": 35.36,
+    "end": 36.98,
+    "speaker": "Foggy",
+    "text": "Did you need any oxycodone today?"
+  },
+  {
+    "start": 37.44,
+    "end": 39.22,
     "speaker": "Patient",
-    "text": "I'm confused about the schedule."
+    "text": "No, the pain's been manageable without it."
   },
   {
-    "start": 32.66,
-    "end": 34.46,
+    "start": 39.56,
+    "end": 40.32,
+    "speaker": "Foggy",
+    "text": "Glad to hear it."
+  },
+  {
+    "start": 40.82,
+    "end": 44,
+    "speaker": "Foggy",
+    "text": "Any new numbness, tingling, or color change in your leg or foot?"
+  },
+  {
+    "start": 44.46,
+    "end": 45.48,
     "speaker": "Patient",
-    "text": "I don't remember when I last took anything."
+    "text": "No, nothing like that."
   },
   {
-    "start": 34.78,
-    "end": 35.6,
+    "start": 45.82,
+    "end": 46.04,
     "speaker": "Foggy",
-    "text": "Thanks for telling me."
+    "text": "Good."
   },
   {
-    "start": 36.12,
-    "end": 39.72,
+    "start": 46.58,
+    "end": 47.8,
     "speaker": "Foggy",
-    "text": "Are you having trouble breathing, chest pain, or any other new symptoms?"
+    "text": "Any falls since you got home?"
   },
   {
-    "start": 40.14,
-    "end": 41.6,
+    "start": 48.54,
+    "end": 49.12,
     "speaker": "Patient",
-    "text": "No, just the shoulder pain."
+    "text": "No falls."
   },
   {
-    "start": 42,
-    "end": 47.9,
-    "speaker": "Foggy",
-    "text": "Because your pain is increasing and your medication timing is unclear, I'm flagging this for your care team to review."
-  },
-  {
-    "start": 48.48,
-    "end": 53.8,
-    "speaker": "Foggy",
-    "text": "Please contact them using the on-call number in your discharge instructions so they can clarify your next steps."
-  },
-  {
-    "start": 54.22,
-    "end": 55.38,
+    "start": 49.6,
+    "end": 52.2,
     "speaker": "Patient",
-    "text": "Can you tell them what's happening?"
+    "text": "Almost tripped over my dog Niko, but I caught myself."
   },
   {
-    "start": 55.8,
-    "end": 56.1,
+    "start": 52.54,
+    "end": 53.58,
     "speaker": "Foggy",
-    "text": "Yes."
+    "text": "Glad you caught yourself."
   },
   {
-    "start": 56.6,
-    "end": 63.66,
+    "start": 54.1,
+    "end": 57.02,
     "speaker": "Foggy",
-    "text": "Your report includes pain increasing from three to six, uncertainty about your last medication dose, and no other symptoms reported."
+    "text": "After this call, would you like me to send the transcript to your care team?"
   },
   {
-    "start": 64.2,
-    "end": 65.56,
-    "speaker": "Foggy",
-    "text": "It will appear in their review queue."
-  },
-  {
-    "start": 65.86,
-    "end": 67.08,
-    "speaker": "Foggy",
-    "text": "It hasn't been acknowledged yet."
-  },
-  {
-    "start": 67.46,
-    "end": 68.84,
+    "start": 57.36,
+    "end": 57.98,
     "speaker": "Patient",
-    "text": "Can you share that with Sam too?"
+    "text": "Yeah, please."
   },
   {
-    "start": 69.22,
-    "end": 72.7,
+    "start": 58.36,
+    "end": 58.74,
     "speaker": "Foggy",
-    "text": "Just confirming, is this the Sam listed as your emergency contact?"
+    "text": "Will do."
   },
   {
-    "start": 73.2,
-    "end": 75.42,
+    "start": 59.14,
+    "end": 60.28,
     "speaker": "Foggy",
-    "text": "If so, I'll go ahead and share it with your permission."
+    "text": "Anything else I can help you with?"
   },
   {
-    "start": 75.8,
-    "end": 76.68,
+    "start": 60.66,
+    "end": 61.16,
     "speaker": "Patient",
-    "text": "Yes, please do."
+    "text": "One thing."
   },
   {
-    "start": 77.06,
-    "end": 77.36,
-    "speaker": "Foggy",
-    "text": "Shared."
-  },
-  {
-    "start": 77.78,
-    "end": 79.14,
-    "speaker": "Foggy",
-    "text": "Is there anything else you need, Alex?"
-  },
-  {
-    "start": 79.52,
-    "end": 80.02,
+    "start": 61.66,
+    "end": 63.1,
     "speaker": "Patient",
-    "text": "I'm all set."
+    "text": "When can I start showering again?"
   },
   {
-    "start": 80.42,
-    "end": 81.34,
+    "start": 63.5,
+    "end": 70.58,
     "speaker": "Foggy",
-    "text": "I hope you feel better."
+    "text": "Your care plan says you can shower 48 hours after surgery with the waterproof dressing on, just no soaking in a bath for four weeks."
   },
   {
-    "start": 81.72,
-    "end": 82.16,
+    "start": 71,
+    "end": 71.24,
+    "speaker": "Patient",
+    "text": "Great."
+  },
+  {
+    "start": 71.5,
+    "end": 71.82,
+    "speaker": "Patient",
+    "text": "That's all."
+  },
+  {
+    "start": 72.14,
+    "end": 72.4,
+    "speaker": "Patient",
+    "text": "Thanks."
+  },
+  {
+    "start": 72.78,
+    "end": 73.6,
     "speaker": "Foggy",
-    "text": "Take care."
+    "text": "You're welcome, Jordan."
+  },
+  {
+    "start": 73.92,
+    "end": 75.98,
+    "speaker": "Foggy",
+    "text": "Keep that leg up and I'll check in again tomorrow."
   }
 ]

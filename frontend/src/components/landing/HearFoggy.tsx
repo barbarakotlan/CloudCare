@@ -8,7 +8,7 @@ import { CallPlayer, type TranscriptLine } from "./CallPlayer";
  */
 const LINES: TranscriptLine[] = transcript;
 /** Length of the MP3 in seconds; the player replaces it with the file's own metadata once loaded. */
-const DURATION = 82.44;
+const DURATION = 76.28;
 
 export function HearFoggy() {
   return (
@@ -20,10 +20,12 @@ export function HearFoggy() {
             Hear a real check-in call.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-ink-soft text-pretty">
-            Foggy calls after discharge, asks about pain and medicines one question at a time, checks for warning signs,
-            and passes a summary to the care team when the patient asks.
+            Foggy calls after discharge, runs the check-in one question at a time, answers from the care plan, and asks
+            before sending anything to the care team.
           </p>
-          <p className="mt-3 text-sm font-semibold text-brand-gray">Recorded demo call with a fictional patient.</p>
+          <p className="mt-3 text-sm font-semibold text-brand-gray">
+            Recorded demo call with Jordan, our fictional demo patient.
+          </p>
         </div>
 
         <div className="mt-10 sm:mt-12">

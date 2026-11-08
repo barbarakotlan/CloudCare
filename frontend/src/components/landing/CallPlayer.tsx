@@ -21,11 +21,18 @@ function spokenTime(seconds: number): string {
   return m > 0 ? `${m} minute${m === 1 ? "" : "s"} ${r} second${r === 1 ? "" : "s"}` : `${r} second${r === 1 ? "" : "s"}`;
 }
 
+/**
+ * Seconds added to the playback clock before matching it against the transcript
+ * timestamps. 0 = the speech-to-text timings are used as-is (checked against the
+ * audio's own speech onsets, which line up within ~0.1 s).
+ */
+const SYNC_OFFSET = 0;
+
 /** Index of the line being spoken at time t; stays on a line through the pause after it. */
 function activeIndex(lines: TranscriptLine[], t: number): number {
   let idx = -1;
   for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].start <= t + 0.05) idx = i;
+    if (lines[i].start <= t + SYNC_OFFSET + 0.05) idx = i;
     else break;
   }
   return idx;
@@ -55,8 +62,13 @@ export function CallPlayer({
   const [duration, setDuration] = useState(fallbackDuration);
   const [failed, setFailed] = useState(false);
   const [started, setStarted] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const current = started ? activeIndex(lines, time) : -1;
+  // Lines appear as the recording reaches them; scrubbing back hides the later ones again.
+  // "Show full transcript" (or a recording that can't play) reveals everything.
+  const revealAll = showAll || failed;
+  const visibleCount = revealAll ? lines.length : current + 1;
 
   // The server-rendered <audio> can load its metadata (or fail) before React attaches handlers.
   useEffect(() => {
@@ -80,14 +92,17 @@ export function CallPlayer({
   }, [playing]);
 
   // Keep the spoken line in view inside the transcript box (never scrolls the page).
+  // While following the call the newest line sits at the bottom, like a chat.
   useEffect(() => {
-    if (current < 0 || !playing) return;
+    if (current < 0) return;
     const list = listRef.current;
     const item = lineRefs.current[current];
     if (!list || !item) return;
-    const top = item.offsetTop - list.clientHeight / 2 + item.clientHeight / 2;
+    const top = revealAll
+      ? item.offsetTop - list.clientHeight / 2 + item.clientHeight / 2
+      : item.offsetTop + item.offsetHeight - list.clientHeight + 16;
     list.scrollTo({ top: Math.max(0, top), behavior: reduced ? "auto" : "smooth" });
-  }, [current, playing, reduced]);
+  }, [current, revealAll, reduced]);
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
@@ -132,7 +147,11 @@ export function CallPlayer({
             const d = e.currentTarget.duration;
             if (Number.isFinite(d) && d > 0) setDuration(d);
           }}
-          onPlay={() => setPlaying(true)}
+          onPlay={() => {
+            // Also covers playback started outside our button (media keys, OS controls).
+            setStarted(true);
+            setPlaying(true);
+          }}
           onPause={() => setPlaying(false)}
           onEnded={(e) => {
             setPlaying(false);
@@ -231,15 +250,42 @@ export function CallPlayer({
 
       {/* Transcript */}
       <div className="rounded-[2rem] bg-surface-soft p-2 ring-1 ring-line">
-        <p id="call-transcript-title" className="px-4 pt-3 pb-2 text-xs font-extrabold tracking-[0.14em] text-brand-gray uppercase">
-          Transcript
-        </p>
+        <div className="flex items-center justify-between gap-3 px-4 pt-1.5 pb-1">
+          <p id="call-transcript-title" className="text-xs font-extrabold tracking-[0.14em] text-brand-gray uppercase">
+            Transcript
+          </p>
+          {failed ? null : (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              aria-pressed={showAll}
+              className="inline-flex min-h-10 items-center rounded-full px-2 text-xs font-bold text-brand-cyan-strong hover:underline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan"
+            >
+              {showAll ? "Follow the call" : "Show full transcript"}
+            </button>
+          )}
+        </div>
+        {/* Fixed height: lines appear inside the box, so the page never shifts while it fills. */}
         <ol
           ref={listRef}
           aria-labelledby="call-transcript-title"
-          className="relative flex max-h-[26rem] flex-col gap-1.5 overflow-y-auto overscroll-contain px-2 pb-3 [scrollbar-width:thin] sm:max-h-[30rem] sm:px-3"
+          className="relative flex h-[26rem] flex-col gap-1.5 overflow-y-auto overscroll-contain px-2 pb-3 [scrollbar-width:thin] sm:h-[30rem] sm:px-3"
         >
-          {lines.map((line, i) => {
+          {visibleCount === 0 && lines.length > 0 ? (
+            <li className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
+              <p className="text-sm font-bold text-brand-gray">Press play to follow the call</p>
+              <button
+                type="button"
+                onClick={() => seek(lines[0].start, true)}
+                aria-label={`Play from the start: ${lines[0].speaker} says ${lines[0].text}`}
+                className="flex max-w-[88%] items-center gap-2 rounded-[1.15rem] rounded-bl-md bg-white px-3.5 py-2 text-left text-[0.95rem] leading-snug text-ink opacity-50 ring-1 ring-line transition-opacity hover:opacity-80 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan"
+              >
+                <FoggyAvatar size={24} decorative />
+                {lines[0].text}
+              </button>
+            </li>
+          ) : null}
+          {lines.slice(0, visibleCount).map((line, i) => {
             const foggy = line.speaker.toLowerCase() === "foggy";
             const active = i === current;
             const firstOfRun = i === 0 || lines[i - 1].speaker !== line.speaker;
@@ -249,7 +295,14 @@ export function CallPlayer({
                 ref={(el) => {
                   lineRefs.current[i] = el;
                 }}
-                className={cn("flex flex-col", foggy ? "items-start pl-9" : "items-end", firstOfRun && i > 0 && "mt-2")}
+                className={cn(
+                  "flex flex-col",
+                  foggy ? "items-start pl-9" : "items-end",
+                  firstOfRun && i > 0 && "mt-2",
+                  // Entrance as the line is reached: fade in and rise 4px.
+                  !revealAll &&
+                    "transition-[opacity,translate] duration-[180ms] ease-out starting:translate-y-1 starting:opacity-0 motion-reduce:transition-none",
+                )}
               >
                 {firstOfRun ? (
                   <span className={cn("mb-1 flex items-center gap-1.5 text-xs font-extrabold text-brand-gray", foggy && "-ml-9")}>
@@ -274,7 +327,7 @@ export function CallPlayer({
                       (active
                         ? "bg-brand-cyan-strong shadow-soft ring-2 ring-brand-cyan-strong ring-offset-2 ring-offset-surface-soft"
                         : "bg-brand-cyan hover:bg-brand-cyan-strong"),
-                    started && current >= 0 && i > current && "opacity-60",
+                    revealAll && started && current >= 0 && i > current && "opacity-60",
                   )}
                 >
                   {line.text}

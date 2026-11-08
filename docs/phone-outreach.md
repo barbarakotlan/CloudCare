@@ -9,11 +9,12 @@ Status wording is literal: "Text sent" means the texting service accepted it for
 | Piece | Where |
 |---|---|
 | Number on the profile | `patients.phone` (E.164, e.g. `+15551234567`) and `patients.phone_verified_at` (unused for now). SQL: `database/patient_phone.sql`. |
-| Number at sign-up | The sign-up form sends `options.data.phone`; Supabase stores it in `user_metadata.phone`. On first sign-in the API copies it onto the new patient profile (`backend/app/auth.py`). An unusable number is ignored, never blocks sign-in. |
-| Patient edits the number | `PATCH /patients/me {phone}` |
+| Number at sign-up | "Mobile number (optional)" on the sign-up form (`LoginForm.tsx`), checked and converted to E.164 in the browser (`frontend/src/lib/phone.ts`, US default) and sent as `options.data.phone`; Supabase stores it in `user_metadata.phone`. On first sign-in the API copies it onto the new patient profile (`backend/app/auth.py`). An unusable number is ignored, never blocks sign-in. |
+| Patient edits the number | `PATCH /patients/me {phone}` (patients only; any common format; `null` or `""` clears; 422 with a readable message for unusable numbers). `PatientOut.phone` returns it. |
+| Clinician edits the number | `PATCH /patients/{id}` accepts `phone` too; the drawer's Overview shows "Mobile" and the Profile tab has the field. |
 | Outreach API | `backend/app/outreach/` (router prefix `/outreach`, patients only) |
 | History | `outreach_log` table (last four digits, channel, kind, status, provider id). SQL: `database/outreach.sql`. |
-| Dashboard card | `frontend/src/components/patient/TestOnPhoneCard.tsx` |
+| Dashboard card | `frontend/src/components/patient/TestOnPhoneCard.tsx`, under the check-in card: the number (inline edit), "Check in here" (scrolls to the check-in), "Text me", "Call me". Buttons stay off with a short reason until the server is set up and a number is on file. |
 
 ### Endpoints
 
@@ -121,6 +122,14 @@ Check-in (`kind: "checkin"`):
 Plan summary (`kind: "plan_summary"`):
 
 > Hi Jordan, it's Foggy from CloudCare. Your care plan covers: Wound care, Activity, Pain and swelling, Medications, When to call. Read it any time: https://cloudcare.icu/patient/dashboard For chest pain or trouble breathing, call 911. Reply STOP to opt out.
+
+## Verify end to end (after the setup above)
+
+1. On https://cloudcare.icu, sign in as the demo patient (it has a care plan) and add your own mobile number in the "Test on my phone" card, or create a new patient account with your number at sign-up (new accounts have no care plan until a clinician adds one). The card shows the number formatted, for example "(555) 123-4567". Remove your number from the shared demo account afterwards.
+2. "Text me": the card shows "Text sent to ···1234", then "Text delivered" within about 15 seconds. If it shows "wasn't delivered" with a carrier reason, the number's texting registration is still pending.
+3. Wait for the button to come back (60 s). "Call me": the card shows "Call started"; the phone rings from the Twilio number; Foggy greets you by first name. Ask "Can I shower?": on the demo account the answer comes from its care plan, which means the call's tool access works.
+4. ElevenLabs → Agents → Calls History shows the call. `outreach_log` has one `sms` row and one `call` row with only the last four digits.
+5. Pressing "Text me" twice quickly sends one text; the second press is held for the rest of the minute.
 
 ## Not done yet
 

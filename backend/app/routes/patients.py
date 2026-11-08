@@ -80,8 +80,18 @@ def list_my_patients(db: Session = Depends(get_db), clinician: User = Depends(re
     return rows
 
 
+DEMO_EMAIL_DOMAIN = "@demo.com"
+
+
+def require_claiming_clinician(clinician: User = Depends(require_clinician)) -> User:
+    """A clinician who may see and claim unassigned sign-ups. Demo accounts can't: their login is public."""
+    if (clinician.email or "").strip().lower().endswith(DEMO_EMAIL_DOMAIN):
+        raise HTTPException(403, "Demo accounts can't claim patients")
+    return clinician
+
+
 @router.get("/unassigned", response_model=list[UnassignedPatientOut])
-def list_unassigned(db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
+def list_unassigned(db: Session = Depends(get_db), clinician: User = Depends(require_claiming_clinician)):
     """Patients no clinician has picked up yet (self sign-ups), newest first.
 
     Only what a clinician needs to recognise the person; nothing clinical.
@@ -98,7 +108,9 @@ def list_unassigned(db: Session = Depends(get_db), clinician: User = Depends(req
 
 
 @router.post("/{patient_id}/assign", response_model=PatientOut)
-def assign_to_me(patient_id: uuid.UUID, db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
+def assign_to_me(
+    patient_id: uuid.UUID, db: Session = Depends(get_db), clinician: User = Depends(require_claiming_clinician),
+):
     """The calling clinician takes on an unassigned patient. 409 if another clinician already has them."""
     patient = db.get(Patient, patient_id)
     if patient is None:

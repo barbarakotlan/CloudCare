@@ -182,20 +182,35 @@ def test_patients_list_excludes_unassigned():
 def test_unassigned_list_and_claim():
     client, TestSession, ctx = _setup()
     pid = _new_patient(TestSession, None, name="Real Signup")
-    listed = client.get("/patients/unassigned", headers=ctx["clinician"])
+    doc_id, doc = _new_user(TestSession, "real.doc@example.com", "clinician", "Dr. Real")
+    listed = client.get("/patients/unassigned", headers=doc)
     assert listed.status_code == 200, listed.text
     assert [r["id"] for r in listed.json()] == [pid]
     assert listed.json()[0]["full_name"] == "Real Signup"
 
-    res = client.post(f"/patients/{pid}/assign", headers=ctx["clinician"])
+    res = client.post(f"/patients/{pid}/assign", headers=doc)
     assert res.status_code == 200, res.text
     assert res.json()["id"] == pid
     # Idempotent for the same clinician.
-    assert client.post(f"/patients/{pid}/assign", headers=ctx["clinician"]).status_code == 200
+    assert client.post(f"/patients/{pid}/assign", headers=doc).status_code == 200
     with TestSession() as db:
-        assert db.get(Patient, uuid.UUID(pid)).clinician_id == ctx["clinician_id"]
-    assert pid in {r["id"] for r in client.get("/patients", headers=ctx["clinician"]).json()}
-    assert client.get("/patients/unassigned", headers=ctx["clinician"]).json() == []
+        assert db.get(Patient, uuid.UUID(pid)).clinician_id == doc_id
+    assert pid in {r["id"] for r in client.get("/patients", headers=doc).json()}
+    assert client.get("/patients/unassigned", headers=doc).json() == []
+    # The demo clinician never sees the claimed patient.
+    assert pid not in {r["id"] for r in client.get("/patients", headers=ctx["clinician"]).json()}
+
+
+def test_demo_clinician_cannot_see_or_claim_signups():
+    client, TestSession, ctx = _setup()
+    pid = _new_patient(TestSession, None, name="Real Signup")
+    listed = client.get("/patients/unassigned", headers=ctx["clinician"])
+    assert listed.status_code == 403 and listed.json()["detail"] == "Demo accounts can't claim patients"
+    claim = client.post(f"/patients/{pid}/assign", headers=ctx["clinician"])
+    assert claim.status_code == 403 and claim.json()["detail"] == "Demo accounts can't claim patients"
+    with TestSession() as db:
+        assert db.get(Patient, uuid.UUID(pid)).clinician_id is None
+    assert pid not in {r["id"] for r in client.get("/patients", headers=ctx["clinician"]).json()}
 
 
 def test_assign_refuses_other_clinicians_patient_and_unknown():

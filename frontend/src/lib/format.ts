@@ -96,7 +96,7 @@ export const TRIGGER_LABEL: Record<EscalationTrigger, string> = {
   red_flag: "Red-flag symptom",
   high_risk: "High risk check-in",
   unanswered_question: "Question not in plan",
-  patient_request: "Patient asked for help",
+  patient_request: "Patient asked to contact you",
 };
 
 export const MOBILITY_LABEL = [

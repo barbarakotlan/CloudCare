@@ -1,6 +1,6 @@
 "use client";
 
-import { BellRing, CheckCheck, Eye, Inbox, LoaderCircle, RotateCcw, Siren } from "lucide-react";
+import { BellRing, CheckCheck, Eye, Inbox, LoaderCircle, MessageSquareShare, RotateCcw, Siren } from "lucide-react";
 import { useId, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -8,10 +8,10 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { Textarea } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Skeleton } from "@/components/ui/Skeleton";
-import type { EscalationOut, EscalationStatus } from "@/lib/api/types";
+import type { EscalationOut, EscalationStatus, EscalationTrigger } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { formatDateTime, relativeTime, SEVERITY_LABEL, TRIGGER_LABEL } from "@/lib/format";
-import { SEVERITY_BAR, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE } from "./severity";
+import { SEVERITY_BAR, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE, TRIGGER_TONE } from "./severity";
 
 export type QueueFilter = "active" | "resolved" | "all";
 
@@ -95,7 +95,7 @@ export function EscalationQueue({
             {filter === "active" ? "Nothing needs you right now" : "No escalations here yet"}
           </p>
           <p className="mt-1 max-w-sm text-sm text-brand-gray">
-            Red-flag messages, high-risk check-ins and questions outside the care plan will appear here within seconds.
+            Red-flag messages, high-risk check-ins and patients asking to contact you will appear here within seconds.
           </p>
         </div>
       ) : null}
@@ -116,6 +116,20 @@ export function EscalationQueue({
       ) : null}
     </Card>
   );
+}
+
+export function TriggerLabel({ trigger }: { trigger: EscalationTrigger }) {
+  const label = TRIGGER_LABEL[trigger] ?? trigger;
+  const tone = TRIGGER_TONE[trigger];
+  if (tone) {
+    return (
+      <Badge tone={tone}>
+        <MessageSquareShare className="size-3.5" aria-hidden="true" />
+        {label}
+      </Badge>
+    );
+  }
+  return <span className="text-sm font-bold text-ink-soft">{label}</span>;
 }
 
 function EscalationItem({
@@ -162,7 +176,7 @@ function EscalationItem({
           {emergency ? <Siren className="size-3.5" aria-hidden="true" /> : null}
           {SEVERITY_LABEL[item.severity]}
         </Badge>
-        <span className="text-sm font-bold text-ink-soft">{TRIGGER_LABEL[item.trigger_type] ?? item.trigger_type}</span>
+        <TriggerLabel trigger={item.trigger_type} />
         <Badge tone={STATUS_TONE[item.status]} className="ml-auto">
           {STATUS_LABEL[item.status]}
         </Badge>

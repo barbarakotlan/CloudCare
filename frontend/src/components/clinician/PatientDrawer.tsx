@@ -40,10 +40,10 @@ import {
   relativeTime,
   RISK_LABEL,
   SEVERITY_LABEL,
-  TRIGGER_LABEL,
 } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
 import { CarePlanUpload } from "./CarePlanUpload";
+import { TriggerLabel } from "./EscalationQueue";
 import { PatientProfileForm } from "./PatientProfileForm";
 import { RISK_TONE, SEVERITY_TONE, STATUS_LABEL } from "./severity";
 
@@ -292,7 +292,7 @@ function DrawerBody({
                     <Badge tone={SEVERITY_TONE[e.severity]} dot>
                       {SEVERITY_LABEL[e.severity]}
                     </Badge>
-                    <span className="font-bold text-ink-soft">{TRIGGER_LABEL[e.trigger_type] ?? e.trigger_type}</span>
+                    <TriggerLabel trigger={e.trigger_type} />
                     <span className="ml-auto text-xs text-brand-gray">{STATUS_LABEL[e.status]}</span>
                   </div>
                   <p className="mt-1 text-ink-soft">{e.summary}</p>
@@ -352,7 +352,7 @@ function DrawerBody({
           {chat.error ? <p role="alert" className="text-sm text-brand-red-dark">{chat.error}</p> : null}
           {chat.data && chat.data.length === 0 ? <p className="text-sm text-brand-gray">No messages yet.</p> : null}
           <div className="flex flex-col gap-3">
-            {chat.data?.map((m) => <MessageBubble key={m.id} message={fromApiMessage(m)} />)}
+            {chat.data?.map((m) => <MessageBubble key={m.id} message={fromApiMessage(m)} transcript />)}
           </div>
         </section>
       ) : null}

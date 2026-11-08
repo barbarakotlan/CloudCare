@@ -1,5 +1,10 @@
 import type { BadgeTone } from "@/components/ui/Badge";
-import type { EscalationStatus, RiskLevel, Severity } from "@/lib/api/types";
+import type { EscalationStatus, EscalationTrigger, RiskLevel, Severity } from "@/lib/api/types";
+
+/** Triggers shown as a badge next to severity; the rest render as plain text. */
+export const TRIGGER_TONE: Partial<Record<EscalationTrigger, BadgeTone>> = {
+  patient_request: "cyan",
+};
 
 export const SEVERITY_TONE: Record<Severity, BadgeTone> = {
   emergency: "red",

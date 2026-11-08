@@ -14,11 +14,12 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.outreach import OutreachLog
+from app.outreach import guard
 
 log = logging.getLogger("cloudcare.outreach")
 
@@ -27,9 +28,27 @@ _last_attempt: dict[tuple[uuid.UUID, str], float] = {}
 
 
 def reset() -> None:
-    """Tests only."""
+    """Tests only. Also clears the abuse limits in guard.py."""
     with _lock:
         _last_attempt.clear()
+    guard.reset()
+
+
+def count_since(db: Session, patient_id: uuid.UUID, channel: str, seconds: int) -> int:
+    """How many texts/calls this patient attempted on this channel in the last `seconds`."""
+    since = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+    try:
+        return db.scalar(
+            select(func.count()).select_from(OutreachLog).where(
+                OutreachLog.patient_id == patient_id,
+                OutreachLog.channel == channel,
+                OutreachLog.created_at >= since,
+            )
+        ) or 0
+    except SQLAlchemyError as exc:
+        db.rollback()
+        log.warning("outreach.log.unavailable op=count type=%s", type(exc).__name__)
+        return 0
 
 
 def _as_utc(value: datetime) -> datetime:

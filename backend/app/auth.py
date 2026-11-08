@@ -18,7 +18,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -26,7 +26,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Patient, User
+from app.outreach import guard
 from app.outreach.phone import PhoneError, normalize_e164
+from app.security import is_production
 
 log = logging.getLogger("cloudcare.auth")
 
@@ -34,9 +36,35 @@ DEV_JWT_SECRET = "dev-only-change-me"
 JWT_SECRET = os.getenv("JWT_SECRET") or DEV_JWT_SECRET
 JWT_ALGORITHM = "HS256"
 TOKEN_HOURS = 12
+# HS256 keys shorter than the hash output are brute-forceable offline from any issued token.
+MIN_JWT_SECRET_LENGTH = 32
 
-if JWT_SECRET == DEV_JWT_SECRET:
-    log.warning("JWT_SECRET is not set; using the development default. Set it before deploying.")
+
+def jwt_secret_problem(secret: str | None = None) -> str | None:
+    """Why the HS256 secret is unsafe for production, or None when it is fine."""
+    secret = JWT_SECRET if secret is None else secret
+    if not secret or secret == DEV_JWT_SECRET:
+        return "JWT_SECRET is not set (development default in use)"
+    if len(secret) < MIN_JWT_SECRET_LENGTH:
+        return f"JWT_SECRET is shorter than {MIN_JWT_SECRET_LENGTH} characters"
+    return None
+
+
+def local_tokens_enabled() -> bool:
+    """CloudCare's own HS256 tokens (password login, phone-call tokens).
+
+    Fail closed: in production (Render, or ENV=production) a missing or weak JWT_SECRET
+    turns them off entirely, so a forged token signed with the public dev default can
+    never be accepted. Supabase sign-in keeps working.
+    """
+    return not (is_production() and jwt_secret_problem() is not None)
+
+
+if jwt_secret_problem() is not None:
+    if is_production():
+        log.error("%s; password sign-in and CloudCare tokens are disabled until it is fixed.", jwt_secret_problem())
+    else:
+        log.warning("%s. Fine for local development; set it before deploying.", jwt_secret_problem())
 
 # ---- Supabase settings --------------------------------------------------------
 # Project URL, e.g. https://<project-ref>.supabase.co. Unset = Supabase tokens are rejected.
@@ -71,13 +99,28 @@ def verify_password(password: str, stored: str) -> bool:
 
 # ---- Tokens -----------------------------------------------------------------
 
+class LocalTokensDisabled(RuntimeError):
+    """Production without a strong JWT_SECRET: CloudCare can't issue its own tokens."""
+
+
+def sign_local_token(payload: dict) -> str:
+    """Signs a CloudCare HS256 token. Every local token must carry `sub` and `exp`."""
+    if not local_tokens_enabled():
+        raise LocalTokensDisabled(jwt_secret_problem() or "local tokens disabled")
+    if "sub" not in payload or "exp" not in payload:
+        raise ValueError("local tokens need sub and exp")
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
 def create_token(user: User) -> str:
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user.id),
         "role": user.role,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS),
+        "iat": now,
+        "exp": now + timedelta(hours=TOKEN_HOURS),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return sign_local_token(payload)
 
 
 class TokenError(Exception):
@@ -107,15 +150,35 @@ def _get_jwks_client() -> jwt.PyJWKClient:
 
 
 def _decode_local(token: str) -> dict:
+    if not local_tokens_enabled():
+        raise TokenError()
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"require": ["exp", "sub"]}
+        )
     except jwt.ExpiredSignatureError:
         raise TokenError("Session expired, please log in again")
     except jwt.PyJWTError:
         raise TokenError()
     if "sub" not in payload:
         raise TokenError()
-    return {"provider": "local", "sub": payload["sub"], "role": payload.get("role")}
+    claims = {"provider": "local", "sub": payload["sub"], "role": payload.get("role")}
+    if "purpose" in payload:
+        claims["purpose"] = payload["purpose"]
+    return claims
+
+
+# A phone-call token (outreach/calls.py) is handed to the voice provider for one call, so it
+# only opens what the agent's tool needs: Foggy's chat. Everything else answers 401.
+PHONE_CALL_PATHS = ("/chat",)
+
+
+def _purpose_allows(purpose: object, path: str) -> bool:
+    if purpose is None:
+        return True
+    if purpose == "phone_call":
+        return any(path == p or path.startswith(p + "/") for p in PHONE_CALL_PATHS)
+    return False
 
 
 def _decode_supabase(token: str) -> dict:
@@ -156,7 +219,8 @@ def _decode_supabase(token: str) -> dict:
         log.warning("Supabase token issuer mismatch; expected %s", SUPABASE_ISSUER)
         raise TokenError("Supabase token was issued by a different project")
     except jwt.PyJWTError as exc:
-        log.info("Rejected Supabase token: %s", exc)
+        # Exception type only: PyJWT messages never include the token, but keep logs minimal.
+        log.info("Rejected Supabase token: %s", type(exc).__name__)
         raise TokenError()
 
     if claims.get("is_anonymous"):
@@ -218,17 +282,20 @@ def _ensure_patient_profile(db: Session, user: User, phone: str | None = None) -
     """
     if db.scalar(select(Patient.id).where(Patient.user_id == user.id)) is not None:
         return
-    db.add(
-        Patient(
-            user_id=user.id,
-            clinician_id=None,
-            procedure_name=PLACEHOLDER_PROCEDURE,
-            procedure_type="unknown",
-            surgery_date=date.today(),
-            comorbidities=[],
-            phone=_signup_phone(phone),
-        )
+    patient = Patient(
+        user_id=user.id,
+        clinician_id=None,
+        procedure_name=PLACEHOLDER_PROCEDURE,
+        procedure_type="unknown",
+        surgery_date=date.today(),
+        comorbidities=[],
+        phone=_signup_phone(phone),
     )
+    db.add(patient)
+    if patient.phone:
+        # A number typed at sign-up is a new destination like any other (outreach/guard.py).
+        db.flush()
+        guard.note_phone_change(patient.id)
 
 
 def _user_from_supabase(db: Session, claims: dict) -> User:
@@ -250,7 +317,8 @@ def _user_from_supabase(db: Session, claims: dict) -> User:
     user = db.scalar(select(User).where(User.email == email))
     if user is not None:
         if user.id != user_id:
-            log.info("Supabase user %s matched local user by email (local id %s).", email, user.id)
+            # Ids only: email addresses are personal data and stay out of the logs.
+            log.info("Supabase user %s matched local user %s by email.", user_id, user.id)
         return user
 
     user = User(
@@ -274,7 +342,7 @@ def _user_from_supabase(db: Session, claims: dict) -> User:
         if user is None:
             raise
         return user
-    log.info("Created local %s account for Supabase user %s.", user.role, email)
+    log.info("Created local %s account for Supabase user %s.", user.role, user_id)
     return user
 
 
@@ -282,6 +350,7 @@ bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
+    request: Request,
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
@@ -290,6 +359,8 @@ def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not logged in")
     try:
         claims = decode_token(creds.credentials)
+        if not _purpose_allows(claims.get("purpose"), request.url.path):
+            raise TokenError()
         if claims["provider"] == "supabase":
             user = _user_from_supabase(db, claims)
         else:

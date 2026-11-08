@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -69,7 +69,7 @@ class PatientUpdate(BaseModel):
     surgery_date: date | None = None
     discharge_date: date | None = None
     date_of_birth: date | None = None
-    comorbidities: list[str] | None = None
+    comorbidities: list[Annotated[str, Field(max_length=100)]] | None = Field(default=None, max_length=50)
     # Any common format; stored as E.164. Null or "" clears it.
     phone: str | None = Field(default=None, max_length=32)
 
@@ -81,8 +81,9 @@ class PatientMeUpdate(BaseModel):
 
 
 class CarePlanIn(BaseModel):
-    title: str
-    raw_text: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=200)
+    # Generous for a discharge plan; keeps one upload from filling the database.
+    raw_text: str = Field(min_length=1, max_length=50_000)
 
 
 class CarePlanChunkOut(ORM):
@@ -111,7 +112,7 @@ class SymptomIn(BaseModel):
     nausea: bool = False
     shortness_of_breath: bool = False
     mobility_level: int = Field(default=4, ge=0, le=4)
-    free_text: str | None = None
+    free_text: str | None = Field(default=None, max_length=2000)
     source: Literal["checkin", "chat", "voice"] = "checkin"
 
 
@@ -260,7 +261,7 @@ class EscalationOut(BaseModel):
 
 class EscalationUpdate(BaseModel):
     status: Literal["open", "acknowledged", "resolved"]
-    clinician_notes: str | None = None
+    clinician_notes: str | None = Field(default=None, max_length=4000)
 
 
 # ---- Demo -------------------------------------------------------------------

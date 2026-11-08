@@ -18,9 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import httpx
-import jwt
 
-from app.auth import JWT_ALGORITHM, JWT_SECRET
+from app.auth import sign_local_token
 from app.models import User
 from app.outreach.config import OutreachSettings, http_client
 
@@ -48,7 +47,8 @@ def call_token(user: User) -> str:
         "iat": now,
         "exp": now + timedelta(minutes=CALL_TOKEN_MINUTES),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    # Raises LocalTokensDisabled in production without a strong JWT_SECRET (router checks first).
+    return sign_local_token(payload)
 
 
 def first_name(full_name: str | None) -> str:

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_patient, get_current_user, get_patient_for_clinician
 from app.database import get_db
 from app.models import ChatMessage, Patient, User
+from app.rate_limits import limit_chat
 from app.schemas import ChatCapabilities, ChatIn, ChatMessageOut, ChatReply
 from app.services.foggy import answer_turn, capabilities
 
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 log = logging.getLogger("cloudcare.chat")
 
 
-@router.post("", response_model=ChatReply)
+@router.post("", response_model=ChatReply, dependencies=[Depends(limit_chat)])
 def send_message(body: ChatIn, db: Session = Depends(get_db), patient: Patient = Depends(get_current_patient)):
     """One Foggy turn (text or voice share the same routing and state; docs/foggy-policy.md).
 

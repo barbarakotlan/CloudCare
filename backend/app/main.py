@@ -1,8 +1,10 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,10 @@ from app import epic
 from app.database import Base, SessionLocal, engine, get_db
 from app.outreach.router import router as outreach_router
 from app.routes import auth, chat, demo, escalations, patients, recovery, symptoms
+from app.security import MAX_BODY_BYTES, BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from app.seed import seed_demo_users
+
+log = logging.getLogger("cloudcare.api")
 
 
 @asynccontextmanager
@@ -35,13 +40,27 @@ CORS_ORIGINS = [
     if origin.strip()
 ]
 
+# The browser sends a bearer token in Authorization, never cookies, so credentials stay off:
+# a stray origin in CORS_ORIGINS can't ride on a cookie session, and "*" can't be combined
+# with credentials by mistake.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+    max_age=600,
 )
+# Outermost last: headers are added to every response, including CORS preflights and 413s.
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_BODY_BYTES)
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    """Never send a stack trace or exception text to the client; the log keeps the details."""
+    log.exception("unhandled.error path=%s", request.url.path)
+    return JSONResponse({"detail": "Something went wrong on our side. Please try again."}, status_code=500)
 
 app.include_router(auth.router)
 app.include_router(patients.router)

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, get_patient_for_clinician
 from app.database import get_db
 from app.models import Escalation, Patient, RiskScore, SymptomLog, User
+from app.rate_limits import limit_checkin
 from app.schemas import RiskOut, SymptomIn, SymptomOut, SymptomResult
 from app.services.ml_service import score_risk
 
@@ -26,7 +27,7 @@ def _patient_for(user: User, db: Session, patient_id: uuid.UUID | None) -> Patie
     return get_patient_for_clinician(db, user, patient_id)
 
 
-@router.post("", response_model=SymptomResult, status_code=201)
+@router.post("", response_model=SymptomResult, status_code=201, dependencies=[Depends(limit_checkin)])
 def log_symptoms(body: SymptomIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Patient check-in -> risk score -> escalation if high."""
     if user.role != "patient":

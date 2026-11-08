@@ -171,10 +171,11 @@ def test_patch_validation():
     url = f"/patients/{ctx['patient_id']}"
     assert client.patch(url, headers=ctx["clinician"], json={"procedure_name": "   "}).status_code == 422
     assert client.patch(url, headers=ctx["clinician"], json={"surgery_date": "not-a-date"}).status_code == 422
-    bad_order = {"surgery_date": "2026-11-05", "discharge_date": "2026-11-01"}
+    # Fixed dates far from the seed's "surgery 3 days ago", so the check holds on any run date.
+    bad_order = {"surgery_date": "2020-03-05", "discharge_date": "2020-03-01"}
     assert client.patch(url, headers=ctx["clinician"], json=bad_order).status_code == 422
     # Nothing from the rejected request was saved.
-    assert client.get(url, headers=ctx["clinician"]).json()["surgery_date"] != "2026-11-05"
+    assert client.get(url, headers=ctx["clinician"]).json()["surgery_date"] != "2020-03-05"
 
 
 def test_patch_is_clinician_and_assignment_only():

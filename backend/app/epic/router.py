@@ -23,6 +23,7 @@ from app.epic.schemas import (
     EpicStatusOut,
 )
 from app.models import User
+from app.rate_limits import limit_epic_start
 
 log = logging.getLogger("cloudcare.epic")
 
@@ -66,6 +67,7 @@ def connect_start(
     settings: EpicSettings = Depends(epic_settings),
     user: User = Depends(require_patient),
     db: Session = Depends(get_db),
+    _limit: None = Depends(limit_epic_start),
 ):
     try:
         endpoints = discover(settings.fhir_base_url)

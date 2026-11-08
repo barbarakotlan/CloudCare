@@ -60,6 +60,11 @@ class OutreachSettings:
     # Outbound calls: Twilio answering-machine detection on/off, and ring time in seconds.
     machine_detection: bool = True
     ringing_timeout_secs: int = DEFAULT_RINGING_TIMEOUT_SECS
+    # Numbers (E.164) the shared public demo accounts may text or call. Empty = none.
+    demo_allowlist: tuple[str, ...] = ()
+
+    def demo_number_allowed(self, e164: str | None) -> bool:
+        return bool(e164) and e164 in self.demo_allowlist
 
     @property
     def sms_missing(self) -> list[str]:
@@ -115,7 +120,23 @@ def get_settings() -> OutreachSettings:
         machine_detection=_env_flag("OUTREACH_MACHINE_DETECTION", True),
         ringing_timeout_secs=_env_int("OUTREACH_RINGING_TIMEOUT_SECS", DEFAULT_RINGING_TIMEOUT_SECS,
                                       *RINGING_TIMEOUT_RANGE),
+        demo_allowlist=_demo_allowlist(),
     )
+
+
+def _demo_allowlist() -> tuple[str, ...]:
+    """OUTREACH_DEMO_ALLOWLIST: comma-separated numbers, normalized to E.164; unusable entries are skipped."""
+    from app.outreach.phone import PhoneError, normalize_e164
+
+    out: list[str] = []
+    for raw in _env("OUTREACH_DEMO_ALLOWLIST").split(","):
+        if not raw.strip():
+            continue
+        try:
+            out.append(normalize_e164(raw))
+        except PhoneError:
+            continue
+    return tuple(out)
 
 
 # ---- HTTP client -----------------------------------------------------------------

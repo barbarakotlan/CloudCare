@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_patient, get_patient_for_clinician, require_clinician
 from app.database import get_db
 from app.models import CarePlan, CarePlanChunk, Escalation, Patient, RiskScore, SymptomLog, User
+from app.outreach import guard
 from app.outreach.phone import PhoneError, normalize_e164
+from app.rate_limits import limit_care_plan
 from app.schemas import (
     CarePlanIn, CarePlanOut, PatientMeUpdate, PatientOut, PatientRow, PatientUpdate, RiskOut, UnassignedPatientOut,
 )
@@ -38,6 +40,8 @@ def apply_phone(patient: Patient, raw: str | None) -> None:
     if phone != patient.phone:
         patient.phone = phone
         patient.phone_verified_at = None
+        # A new destination: texts and calls wait out a cooldown (outreach/guard.py).
+        guard.note_phone_change(patient.id)
 
 
 def _worklist_order(row: PatientRow) -> tuple:
@@ -211,7 +215,9 @@ def get_care_plan(patient_id: uuid.UUID, db: Session = Depends(get_db), clinicia
     return active_care_plan(db, patient.id)
 
 
-@router.post("/{patient_id}/care-plan", response_model=CarePlanOut, status_code=201)
+@router.post(
+    "/{patient_id}/care-plan", response_model=CarePlanOut, status_code=201, dependencies=[Depends(limit_care_plan)]
+)
 def upload_care_plan(
     patient_id: uuid.UUID,
     body: CarePlanIn,

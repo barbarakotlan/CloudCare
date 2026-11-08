@@ -63,6 +63,8 @@ ENV = {
     "ELEVENLABS_AGENT_ID": "agent_test",
     "ELEVENLABS_PHONE_NUMBER_ID": "phnum_test",
     "PUBLIC_APP_URL": "https://cloudcare.icu",
+    # These tests sign in as the shared demo patient, which may only reach allowlisted numbers.
+    "OUTREACH_DEMO_ALLOWLIST": PHONE,
 }
 ALL_KEYS = list(ENV) + ["TWILIO_MESSAGING_SERVICE_SID", "OUTREACH_ALLOWED_COUNTRY_CODES", "ELEVENLABS_API_BASE",
                         "OUTREACH_MACHINE_DETECTION", "OUTREACH_RINGING_TIMEOUT_SECS"]

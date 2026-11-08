@@ -19,7 +19,7 @@ from app.demo_data import add_jordan_baseline_checkins
 from app.models import (
     ChatMessage, ChatSession, Escalation, Medication, MedicationLog, OutreachLog, Patient, RiskScore, SymptomLog, User,
 )
-from app.outreach import log as outreach_log
+from app.rate_limits import limit_demo_reset
 from app.schemas import DemoResetOut
 
 log = logging.getLogger("cloudcare.demo")
@@ -40,7 +40,11 @@ def require_reset_permission(user: User = Depends(get_current_user)) -> User:
 
 
 @router.post("/reset", response_model=DemoResetOut)
-def reset_demo_patient(db: Session = Depends(get_db), user: User = Depends(require_reset_permission)):
+def reset_demo_patient(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_reset_permission),
+    _limit: None = Depends(limit_demo_reset),
+):
     patient = db.scalar(
         select(Patient).join(User, Patient.user_id == User.id).where(User.email == DEMO_PATIENT_EMAIL)
     )
@@ -72,9 +76,9 @@ def reset_demo_patient(db: Session = Depends(get_db), user: User = Depends(requi
         raise
     db.expire_all()
 
-    # Texts/calls rate limits held in memory for this patient.
-    for channel in ("sms", "call"):
-        outreach_log.release(pid, channel)
+    # The in-memory text/call limits are deliberately NOT released here: the demo login is
+    # public, so a reset must not become a way around the call interval or the abuse caps
+    # in outreach/guard.py. They expire on their own within two minutes.
 
     restored = {"symptom_logs": restored_count, "risk_scores": restored_count}
     log.info("demo.reset by_role=%s deleted=%s", user.role, sum(counts.values()))

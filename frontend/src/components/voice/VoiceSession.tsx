@@ -32,10 +32,11 @@ function voiceVariables(): Record<string, string> {
 
 /**
  * The agent itself starts phone calls silently (the person, a call-screening assistant, or
- * voicemail speaks first), so a web call brings its own opening line.
+ * voicemail speaks first), so a web call brings its own opening line. The first line always
+ * says that Foggy is automated.
  */
 function webGreeting(name: string): string {
-  return `Hi ${name}, this is Foggy, your recovery helper. How are you feeling today?`;
+  return `Hi ${name}, I'm Foggy, an automated recovery helper, not a doctor or nurse. How are you feeling today?`;
 }
 
 export function VoiceSession({ agentId }: { agentId: string }) {

@@ -100,3 +100,8 @@ services:
       # Link put in texts.
       - key: PUBLIC_APP_URL
         value: https://cloudcare.icu
+      # Inbox named on the onboarding-request emails the sales chat stores
+      # (never sent by the API). Empty uses sales@cloudcare.icu. Apply
+      # backend/sales.sql first.
+      - key: SALES_LEAD_TO
+        sync: false

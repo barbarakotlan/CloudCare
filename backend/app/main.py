@@ -13,6 +13,7 @@ from app import epic
 from app.database import Base, SessionLocal, engine, get_db
 from app.outreach.router import router as outreach_router
 from app.routes import auth, chat, demo, escalations, patients, recovery, symptoms
+from app.sales.router import router as sales_router
 from app.security import MAX_BODY_BYTES, BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from app.seed import seed_demo_users
 
@@ -71,6 +72,7 @@ app.include_router(recovery.router)
 app.include_router(epic.router)
 app.include_router(outreach_router)
 app.include_router(demo.router)
+app.include_router(sales_router)
 
 
 @app.get("/")

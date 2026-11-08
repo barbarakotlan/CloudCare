@@ -1,5 +1,4 @@
-import Image from "next/image";
-import { cn } from "@/lib/cn";
+import { FoggyFace } from "@/components/brand/FoggyFace";
 
 type FoggyAvatarProps = {
   className?: string;
@@ -13,21 +12,10 @@ type FoggyAvatarProps = {
 };
 
 /**
- * Foggy's face: the pale-blue cloud from public/brand/foggy.png, shown on its
- * own with no badge behind it. Used wherever Foggy speaks; the red CloudMark
- * stays the brand symbol.
+ * Foggy's face: the pale-blue cloud with eyes (it blinks now and then), shown
+ * on its own with no badge behind it. Used wherever Foggy speaks; the red
+ * CloudMark stays the brand symbol and public/brand/foggy.png stays for icons.
  */
 export function FoggyAvatar({ className, size = 32, decorative = false }: FoggyAvatarProps) {
-  return (
-    <Image
-      src="/brand/foggy.png"
-      width={size}
-      height={size}
-      alt="Foggy"
-      aria-hidden={decorative ? true : undefined}
-      draggable={false}
-      className={cn("pointer-events-none shrink-0 object-contain select-none", className)}
-      style={{ width: size, height: size }}
-    />
-  );
+  return <FoggyFace size={size} decorative={decorative} className={className} />;
 }

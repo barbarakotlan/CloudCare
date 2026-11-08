@@ -28,6 +28,25 @@ Patients get critical recovery instructions right after surgery, while they're s
 
 ---
 
+## ✨ Built with Google Gemini
+
+Foggy, CloudCare's recovery assistant, is powered by **Google Gemini (`gemini-3.6-flash`)**, called through Gemini's OpenAI-compatible API. Gemini handles three jobs:
+
+| Job | What Gemini does | Code |
+|---|---|---|
+| **Understanding messages** | Classifies every patient message into structured facts: the topic, symptoms, medicines mentioned, and yes/no or consent answers. Uses a strict JSON schema | [`services/foggy/classify.py`](backend/app/services/foggy/classify.py) |
+| **Answering from the care plan** | Writes answers grounded in the clinician's care plan, citing the sections it used | [`services/ai_service.py`](backend/app/services/ai_service.py) (`plan_answer`) |
+| **Recovery check-ins** | Interprets the patient's check-in replies (pain score, symptoms, which medicine doses they took) as Foggy guides them through one question at a time | [`services/foggy/router.py`](backend/app/services/foggy/router.py) |
+
+**Safety around the model:**
+- **Fact-checking:** every Gemini answer is checked against the cited care plan text before the patient sees it, to stop invented medical instructions.
+- **Rule-based safety controls:** emergencies are detected by rules *before* Gemini runs, and safety-critical replies (911, "call your surgeon", refusing dose changes) use fixed wording.
+- **Code makes the decisions:** Gemini reads and phrases, while code decides and acts, so a generated sentence can never send a message or change a dose.
+
+See [Foggy](#foggy-ai-assistant) for details and test results.
+
+---
+
 ## Hackathon tracks
 
 ### 🤖 Ethical AI Agent

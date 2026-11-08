@@ -7,6 +7,7 @@ import { Field, Input, Select } from "@/components/ui/Input";
 import { ApiError, errorMessage } from "@/lib/api/client";
 import { updatePatient } from "@/lib/api/patients";
 import { PENDING_SETUP_PROCEDURE, type PatientOut, type PatientUpdate, type ProcedureType } from "@/lib/api/types";
+import { formatAsTyped, formatPhone, optionalE164 } from "@/lib/phone";
 
 const PROCEDURE_TYPES: { value: ProcedureType | string; label: string }[] = [
   { value: "orthopedic", label: "Orthopedic" },
@@ -62,6 +63,7 @@ export function PatientProfileForm({
   const [surgeryDate, setSurgeryDate] = useState(patient.surgery_date);
   const [dischargeDate, setDischargeDate] = useState(patient.discharge_date ?? "");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [phone, setPhone] = useState(formatPhone(patient.phone));
   const [comorbidities, setComorbidities] = useState<string[]>(patient.comorbidities);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -93,6 +95,8 @@ export function PatientProfileForm({
     if (dateOfBirth) body.date_of_birth = dateOfBirth;
     const finalList = addUnique(comorbidities, splitList(draft));
     if (finalList.join("\u0000") !== patient.comorbidities.join("\u0000")) body.comorbidities = finalList;
+    const mobile = optionalE164(phone);
+    if (mobile.ok && mobile.e164 !== (patient.phone ?? null)) body.phone = mobile.e164;
     return body;
   }
 
@@ -105,6 +109,8 @@ export function PatientProfileForm({
     if (dischargeDate && surgeryDate && dischargeDate < surgeryDate) {
       return setError("The discharge date can't be before the surgery date.");
     }
+    const mobile = optionalE164(phone);
+    if (!mobile.ok) return setError(mobile.error);
     const body = buildUpdate();
     commitDraft();
     if (Object.keys(body).length === 0) return setError("Nothing changed yet.");
@@ -177,6 +183,19 @@ export function PatientProfileForm({
 
       <Field label="Date of birth" htmlFor={`${ids}-dob`} hint="Leave blank to keep what's on file.">
         <Input id={`${ids}-dob`} type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+      </Field>
+
+      <Field label="Mobile number" htmlFor={`${ids}-phone`} hint="Used only for the patient's own check-in texts and calls. Clear it to remove.">
+        <Input
+          id={`${ids}-phone`}
+          type="tel"
+          inputMode="tel"
+          autoComplete="off"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          onBlur={() => setPhone((p) => formatAsTyped(p))}
+          placeholder="(555) 123-4567"
+        />
       </Field>
 
       <Field label="Comorbidities" htmlFor={`${ids}-comorb`} hint="Type and press Enter or a comma, e.g. diabetes, smoker.">

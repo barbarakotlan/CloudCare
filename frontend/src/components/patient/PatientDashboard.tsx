@@ -22,6 +22,7 @@ import { EpicPopupReturn } from "./EpicPopupReturn";
 import { GreetingBanner } from "./GreetingBanner";
 import { MyChartCard } from "./MyChartCard";
 import { RemindersCard } from "./RemindersCard";
+import { TestOnPhoneCard } from "./TestOnPhoneCard";
 
 const noSubscribe = () => () => {};
 
@@ -95,9 +96,12 @@ export function PatientDashboard({ session }: { session: Session }) {
               <CheckInCard now={now} />
             </div>
             <div className="min-w-0 lg:col-start-1 lg:row-start-3">
-              <CarePlanCard plan={plan.data} loading={plan.loading} error={plan.error} />
+              <TestOnPhoneCard />
             </div>
             <div className="min-w-0 lg:col-start-1 lg:row-start-4">
+              <CarePlanCard plan={plan.data} loading={plan.loading} error={plan.error} />
+            </div>
+            <div className="min-w-0 lg:col-start-1 lg:row-start-5">
               {/* Includes the MyChartRecords tabs once a connection exists. */}
               <MyChartCard notify={push} now={now} />
             </div>

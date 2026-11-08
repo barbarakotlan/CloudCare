@@ -42,6 +42,7 @@ import {
   SEVERITY_LABEL,
 } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
+import { formatPhone } from "@/lib/phone";
 import { CarePlanUpload } from "./CarePlanUpload";
 import { TriggerLabel } from "./EscalationQueue";
 import { PatientProfileForm } from "./PatientProfileForm";
@@ -222,6 +223,12 @@ function DrawerBody({
                   <dt className="text-brand-gray">Discharged</dt>
                   <dd className="font-bold text-ink">
                     {profile.data.discharge_date ? formatDate(profile.data.discharge_date) : "Not yet"}
+                  </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-brand-gray">Mobile</dt>
+                  <dd className="font-bold text-ink">
+                    {profile.data.phone ? formatPhone(profile.data.phone) : "Not on file"}
                   </dd>
                 </div>
                 <div className="col-span-2">

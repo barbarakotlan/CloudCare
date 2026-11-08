@@ -121,12 +121,18 @@ export function TestOnPhoneCard() {
       setPhoneError(check.error);
       return;
     }
+    await persistPhone(check.e164);
+  }
+
+  /** Saves a checked E.164 number, or clears it with null. */
+  async function persistPhone(value: string | null) {
+    if (savingPhone) return;
     setSavingPhone(true);
     setPhoneError(null);
     try {
-      const saved = await updateMyPhone(check.e164);
+      const saved = await updateMyPhone(value);
       if (!alive.current) return;
-      profile.setData((prev) => ({ ...prev, phone: saved?.phone ?? check.e164 }));
+      profile.setData((prev) => ({ ...prev, phone: saved ? (saved.phone ?? null) : value }));
       setEditing(false);
       setText({ phase: "idle" });
       setCall({ phase: "idle" });
@@ -296,6 +302,17 @@ export function TestOnPhoneCard() {
               <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={savingPhone}>
                 Cancel
               </Button>
+              {storedPhone ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-brand-red-dark"
+                  onClick={() => void persistPhone(null)}
+                  disabled={savingPhone}
+                >
+                  Remove number
+                </Button>
+              ) : null}
             </div>
           </form>
         ) : (

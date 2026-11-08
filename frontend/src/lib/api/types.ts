@@ -40,6 +40,8 @@ export type PatientOut = {
   surgery_date: string;
   discharge_date: string | null;
   comorbidities: string[];
+  /** Mobile number in E.164 (e.g. +15551234567), or null when none is on file. */
+  phone: string | null;
 };
 
 export type ProcedureType = "orthopedic" | "abdominal" | "cardiac" | "spine" | "other";
@@ -52,6 +54,8 @@ export type PatientUpdate = {
   discharge_date?: string | null;
   date_of_birth?: string | null;
   comorbidities?: string[];
+  /** E.164; null clears it. */
+  phone?: string | null;
 };
 
 /** Placeholder procedure the backend gives a patient who signed up before their care team set them up. */

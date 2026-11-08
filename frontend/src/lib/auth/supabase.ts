@@ -76,7 +76,13 @@ export function syncFromSupabase(session: SupabaseSession | null): void {
 export type SignUpResult = { session: Session | null; needsEmailConfirmation: boolean };
 
 /** Creates a patient account. Clinician accounts are only created by the backend seed. */
-export async function signUpPatient(fullName: string, email: string, password: string): Promise<SignUpResult> {
+export async function signUpPatient(
+  fullName: string,
+  email: string,
+  password: string,
+  /** Mobile number in E.164, or null. Copied onto the patient profile on first sign-in. */
+  phone: string | null = null,
+): Promise<SignUpResult> {
   const supabase = getSupabaseClient();
   if (!supabase) throw new AuthError(SUPABASE_NOT_CONFIGURED);
 
@@ -84,8 +90,8 @@ export async function signUpPatient(fullName: string, email: string, password: s
     email: email.trim(),
     password,
     options: {
-      // Display name only. The role is never taken from user_metadata.
-      data: { full_name: fullName.trim() },
+      // Display name and contact number only. The role is never taken from user_metadata.
+      data: phone ? { full_name: fullName.trim(), phone } : { full_name: fullName.trim() },
       emailRedirectTo: `${window.location.origin}/login`,
     },
   });

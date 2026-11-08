@@ -20,6 +20,7 @@ import { errorMessage } from "@/lib/api/client";
 import type { Role } from "@/lib/api/types";
 import { AUTH_PROVIDER_NAME, dashboardPathFor, login, logout, signUpPatient } from "@/lib/auth";
 import { useSession } from "@/lib/auth/useSession";
+import { formatAsTyped, optionalE164 } from "@/lib/phone";
 
 const DEMO: Record<Role, { email: string; password: string; name: string }> = {
   patient: { email: "patient@demo.com", password: "demo123", name: "Jordan Lee" },
@@ -40,6 +41,8 @@ export function LoginForm() {
   const [mode, setMode] = useState<Mode>("signin");
   const [role, setRole] = useState<Role>("patient");
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [email, setEmail] = useState(DEMO.patient.email);
   const [password, setPassword] = useState(DEMO.patient.password);
   const [showPassword, setShowPassword] = useState(false);
@@ -71,6 +74,8 @@ export function LoginForm() {
     if (next === "signup") {
       setRole("patient");
       setFullName("");
+      setPhone("");
+      setPhoneError(null);
       setEmail("");
       setPassword("");
     } else {
@@ -85,8 +90,13 @@ export function LoginForm() {
 
   async function onSignUp() {
     if (!fullName.trim()) throw new Error("Please enter your full name.");
+    const mobile = optionalE164(phone);
+    if (!mobile.ok) {
+      setPhoneError(mobile.error);
+      throw new Error(mobile.error);
+    }
     if (password.length < MIN_PASSWORD) throw new Error(`Use a password with at least ${MIN_PASSWORD} characters.`);
-    const result = await signUpPatient(fullName, email, password);
+    const result = await signUpPatient(fullName, email, password, mobile.e164);
     if (result.session) {
       router.replace(dashboardPathFor(result.session.user.role));
       return;
@@ -176,6 +186,38 @@ export function LoginForm() {
               onChange={(e) => setFullName(e.target.value)}
               aria-invalid={error && !fullName.trim() ? true : undefined}
             />
+          </Field>
+        ) : null}
+        {signingUp ? (
+          <Field
+            label="Mobile number (optional)"
+            htmlFor="login-phone"
+            hint={phoneError ? undefined : "For check-in texts and calls from Foggy. US numbers by default."}
+          >
+            <Input
+              id="login-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="(555) 123-4567"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setPhoneError(null);
+              }}
+              onBlur={() => {
+                setPhone((p) => formatAsTyped(p));
+                const check = optionalE164(phone);
+                setPhoneError(check.ok ? null : check.error);
+              }}
+              aria-invalid={phoneError ? true : undefined}
+              aria-describedby={phoneError ? "login-phone-error" : undefined}
+            />
+            {phoneError ? (
+              <p id="login-phone-error" className="text-sm font-semibold text-brand-red-dark">
+                {phoneError}
+              </p>
+            ) : null}
           </Field>
         ) : null}
         <Field label="Email" htmlFor="login-email">

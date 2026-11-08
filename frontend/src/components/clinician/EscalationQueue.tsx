@@ -20,6 +20,15 @@ import {
 } from "@/lib/format";
 import { SEVERITY_BAR, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE, TRIGGER_TONE } from "./severity";
 
+/**
+ * lg and up: a panel is capped to the viewport under the 4rem app header (plus breathing
+ * room) and lays out as a column, so the page stops growing with list length.
+ */
+export const PANEL_LG = "lg:flex lg:max-h-[calc(100dvh-6rem)] lg:flex-col lg:overflow-hidden";
+/** The part of a panel that scrolls on lg+: thin, quiet scrollbar; scrolling never chains to the page. */
+export const PANEL_SCROLL =
+  "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-color:var(--line)_transparent] lg:[scrollbar-width:thin]";
+
 export type QueueFilter = "active" | "resolved" | "all";
 export type SeverityFilter = Severity | "all";
 
@@ -62,8 +71,9 @@ export function EscalationQueue({
   lastUpdated: number | null;
 }) {
   return (
-    <Card aria-labelledby="queue-title" flush className="min-w-0">
-      <div className="p-5 pb-0 sm:p-6 sm:pb-0">
+    <Card aria-labelledby="queue-title" flush className={cn("min-w-0", PANEL_LG)}>
+      {/* Header and filters stay put; on lg+ only the list below scrolls. */}
+      <div className="p-5 pb-0 sm:p-6 sm:pb-0 lg:shrink-0 lg:border-b lg:border-line/60">
         <CardHeader
           id="queue-title"
           icon={<BellRing className="size-5" aria-hidden="true" />}
@@ -108,53 +118,55 @@ export function EscalationQueue({
         </div>
       </div>
 
-      {error ? (
-        <p role="alert" className="mx-5 mb-4 rounded-2xl bg-brand-red/8 px-4 py-3 text-sm font-semibold text-brand-red-dark sm:mx-6">
-          {error}
-        </p>
-      ) : null}
-
-      {loading && !items ? (
-        <div className="flex flex-col gap-3 p-5 sm:p-6">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </div>
-      ) : null}
-
-      {items && items.length === 0 ? (
-        <div className="flex flex-col items-center px-6 py-12 text-center">
-          <span className="grid size-14 place-items-center rounded-full bg-surface-pale text-brand-cyan-strong">
-            <Inbox className="size-7" aria-hidden="true" />
-          </span>
-          <p className="mt-4 font-extrabold text-ink">
-            {narrowed
-              ? "No escalations match these filters"
-              : filter === "active"
-                ? "Nothing needs you right now"
-                : "No escalations here yet"}
+      <div className={PANEL_SCROLL}>
+        {error ? (
+          <p role="alert" className="mx-5 mt-3 mb-4 rounded-2xl bg-brand-red/8 px-4 py-3 text-sm font-semibold text-brand-red-dark sm:mx-6">
+            {error}
           </p>
-          <p className="mt-1 max-w-sm text-sm text-brand-gray">
-            {narrowed
-              ? "Clear the search or pick another severity to see the rest."
-              : "Red-flag messages, high-risk check-ins and patients asking to contact you will appear here within seconds."}
-          </p>
-        </div>
-      ) : null}
+        ) : null}
 
-      {items && items.length > 0 ? (
-        <ul className="flex flex-col gap-3 p-4 sm:p-6 sm:pt-2" aria-label="Escalations, most urgent first">
-          {items.map((e) => (
-            <EscalationItem
-              key={e.id}
-              item={e}
-              now={now}
-              highlight={highlightIds.has(e.id)}
-              onUpdate={onUpdate}
-              onOpenPatient={onOpenPatient}
-            />
-          ))}
-        </ul>
-      ) : null}
+        {loading && !items ? (
+          <div className="flex flex-col gap-3 p-5 sm:p-6">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+        ) : null}
+
+        {items && items.length === 0 ? (
+          <div className="flex flex-col items-center px-6 py-12 text-center">
+            <span className="grid size-14 place-items-center rounded-full bg-surface-pale text-brand-cyan-strong">
+              <Inbox className="size-7" aria-hidden="true" />
+            </span>
+            <p className="mt-4 font-extrabold text-ink">
+              {narrowed
+                ? "No escalations match these filters"
+                : filter === "active"
+                  ? "Nothing needs you right now"
+                  : "No escalations here yet"}
+            </p>
+            <p className="mt-1 max-w-sm text-sm text-brand-gray">
+              {narrowed
+                ? "Clear the search or pick another severity to see the rest."
+                : "Red-flag messages, high-risk check-ins and patients asking to contact you will appear here within seconds."}
+            </p>
+          </div>
+        ) : null}
+
+        {items && items.length > 0 ? (
+          <ul className="flex flex-col gap-3 p-4 sm:p-6 sm:pt-2 lg:pt-4" aria-label="Escalations, most urgent first">
+            {items.map((e) => (
+              <EscalationItem
+                key={e.id}
+                item={e}
+                now={now}
+                highlight={highlightIds.has(e.id)}
+                onUpdate={onUpdate}
+                onOpenPatient={onOpenPatient}
+              />
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </Card>
   );
 }

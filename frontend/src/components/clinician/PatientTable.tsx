@@ -5,7 +5,9 @@ import type { ReactNode } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PENDING_SETUP_PROCEDURE, type EscalationOut, type PatientRow } from "@/lib/api/types";
+import { cn } from "@/lib/cn";
 import { daysSince, relativeTime } from "@/lib/format";
+import { PANEL_LG, PANEL_SCROLL } from "./EscalationQueue";
 import { FinishSetupBadge } from "./PatientDrawer";
 import { CurrentStatusChip, RiskModelSummary, sortWorklist, urgencyOf } from "./urgency";
 
@@ -38,7 +40,7 @@ export function PatientTable({
 }) {
   const sorted = rows ? sortWorklist(rows, active) : undefined;
   return (
-    <Card aria-labelledby="patients-title" className="min-w-0">
+    <Card aria-labelledby="patients-title" className={cn("min-w-0", PANEL_LG)}>
       <CardHeader
         id="patients-title"
         icon={<UsersRound className="size-5" aria-hidden="true" />}
@@ -100,11 +102,12 @@ export function PatientTable({
             ))}
           </ul>
 
-          {/* Tablet and desktop: table (scrolls inside the card if it ever has to) */}
-          <div className="-mx-2 hidden overflow-x-auto md:block">
+          {/* Tablet and desktop: table (scrolls inside the card if it ever has to; on lg+ the
+              rows scroll under a sticky header row, so the page stays put however long the list) */}
+          <div className={cn("-mx-2 hidden overflow-x-auto md:block", PANEL_SCROLL)}>
             <table className="w-full border-separate border-spacing-y-1 text-left">
               <thead>
-                <tr className="text-xs font-extrabold tracking-wide whitespace-nowrap text-brand-gray uppercase">
+                <tr className="text-xs font-extrabold tracking-wide whitespace-nowrap text-brand-gray uppercase lg:[&>th]:sticky lg:[&>th]:top-0 lg:[&>th]:z-10 lg:[&>th]:bg-white">
                   <th scope="col" className="px-2 py-2">Patient</th>
                   <th scope="col" className="px-2 py-2">Current status</th>
                   <th scope="col" className="px-2 py-2">

@@ -240,24 +240,28 @@ export function ClinicianDashboard({ session }: { session: Session }) {
           </div>
 
           {/* grid-cols-1 (minmax(0,1fr)) matters: an implicit auto column grows to the widest
-              nowrap text inside it, which pushed phones out to ~750 px. */}
+              nowrap text inside it, which pushed phones out to ~750 px.
+              lg+: each panel is its own viewport-tall scroll region (see PANEL_LG); side by side
+              on xl they also pin under the header while the stats scroll away. */}
           <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-            <EscalationQueue
-              items={shownEscalations}
-              loading={escalations === undefined}
-              error={queueError}
-              filter={filter}
-              onFilter={changeFilter}
-              severity={severity}
-              onSeverity={setSeverity}
-              narrowed={narrowedQueue}
-              onUpdate={onUpdate}
-              onOpenPatient={setSelectedId}
-              highlightIds={highlight}
-              now={now}
-              lastUpdated={lastUpdated}
-            />
-            <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
+            <div className="flex min-w-0 flex-col xl:sticky xl:top-20 xl:self-start">
+              <EscalationQueue
+                items={shownEscalations}
+                loading={escalations === undefined}
+                error={queueError}
+                filter={filter}
+                onFilter={changeFilter}
+                severity={severity}
+                onSeverity={setSeverity}
+                narrowed={narrowedQueue}
+                onUpdate={onUpdate}
+                onOpenPatient={setSelectedId}
+                highlightIds={highlight}
+                now={now}
+                lastUpdated={lastUpdated}
+              />
+            </div>
+            <div className="flex min-w-0 flex-col xl:sticky xl:top-20 xl:self-start">
               <PatientTable
                 rows={shownPatients}
                 active={active}

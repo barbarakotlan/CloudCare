@@ -4,7 +4,7 @@ import { Info } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 export const RISK_EXPLAINER =
-  "Estimate from the risk model at the patient's last check-in. Factor weights are relative: they show how much each factor pushed this estimate up, not percentages. Experimental, trained on synthetic data. Not a diagnosis.";
+  "Estimate from the risk model at the patient's last check-in. Factor shares split what pushed this estimate up between the top factors; they are not risk percentages. Experimental, trained on synthetic data. Not a diagnosis.";
 
 const WIDTH = 272; // px, matches w-68
 

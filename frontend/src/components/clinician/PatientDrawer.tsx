@@ -314,17 +314,30 @@ function DrawerBody({
                       What pushes this estimate up
                     </p>
                     <ul className="mt-2 flex flex-col gap-2">
-                      {factorWeights.map((f) => (
-                        <li key={f.feature} className="flex items-center gap-3 text-sm">
-                          <span className="w-10 shrink-0 text-right font-extrabold text-brand-cyan-strong tabular-nums">
-                            +{f.weight}
-                          </span>
-                          <span className="w-32 shrink-0 font-semibold text-ink sm:w-40">{factorLabel(f.feature)}</span>
-                          <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
-                            <span className="block h-full rounded-full bg-brand-cyan" style={{ width: `${f.weight}%` }} />
-                          </span>
-                        </li>
-                      ))}
+                      {factorWeights.map((f) => {
+                        // One factor: no share to show (it would always be 100%).
+                        const only = factorWeights.length === 1;
+                        return (
+                          <li key={f.feature} className="flex items-center gap-3 text-sm">
+                            <span
+                              className={
+                                only
+                                  ? "shrink-0 font-extrabold whitespace-nowrap text-brand-cyan-strong"
+                                  : "w-12 shrink-0 text-right font-extrabold text-brand-cyan-strong tabular-nums"
+                              }
+                            >
+                              {only ? "Main factor" : `+${f.weight}%`}
+                            </span>
+                            <span className="w-32 shrink-0 font-semibold text-ink sm:w-40">{factorLabel(f.feature)}</span>
+                            <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
+                              <span
+                                className="block h-full rounded-full bg-brand-cyan"
+                                style={{ width: only ? "100%" : `${f.weight}%` }}
+                              />
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                     <p className="mt-3 text-xs leading-relaxed text-brand-gray">
                       Weights are relative; the model is experimental and trained on synthetic data.

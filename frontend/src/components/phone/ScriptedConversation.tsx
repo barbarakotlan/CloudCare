@@ -47,6 +47,21 @@ function PhoneBubble({ step }: { step: ScriptStep }) {
           {step.status.text}
         </span>
       ) : null}
+      {step.chips ? (
+        <div className="flex flex-wrap gap-1">
+          {step.chips.map((chip, i) => (
+            <span
+              key={chip}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-[0.62rem] font-bold",
+                i === 0 ? "bg-brand-cyan text-white" : "bg-white text-ink-soft ring-1 ring-line",
+              )}
+            >
+              {chip}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

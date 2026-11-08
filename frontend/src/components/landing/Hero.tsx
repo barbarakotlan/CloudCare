@@ -1,4 +1,4 @@
-import { BellRing, CheckCircle2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ShieldCheck, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { CloudShape } from "@/components/brand/CloudShape";
 import { Swoosh } from "@/components/brand/Swoosh";
@@ -40,7 +40,7 @@ export function Hero() {
 
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft text-pretty sm:text-xl">
           Anesthesia fog makes discharge instructions easy to forget. Foggy texts and talks you through the plan your
-          care team wrote, and brings a real person in whenever something isn&rsquo;t right.
+          care team wrote, and helps you reach a real person whenever something isn&rsquo;t right.
         </p>
 
         <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -57,9 +57,9 @@ export function Hero() {
           />
           <FloatingNote
             className="top-[19rem] -right-72 hidden lg:flex"
-            icon={<BellRing className="size-5 text-brand-red" aria-hidden="true" />}
-            title="Dr. Patel’s team notified"
-            body="Question not in the care plan"
+            icon={<UsersRound className="size-5 text-brand-cyan-strong" aria-hidden="true" />}
+            title="Offers to contact the care team"
+            body="Nothing is sent without your OK"
           />
           <FloatingNote
             className="bottom-28 -left-72 hidden lg:flex"

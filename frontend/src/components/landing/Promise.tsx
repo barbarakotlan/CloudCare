@@ -1,4 +1,4 @@
-import { BookOpenCheck, CircleSlash, Pill, Send, Siren, UsersRound } from "lucide-react";
+import { BookOpenCheck, CircleSlash, Pill, Siren, UsersRound } from "lucide-react";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
 
 const PROMISES = [
@@ -10,7 +10,7 @@ const PROMISES = [
   {
     icon: CircleSlash,
     title: "Declines what it doesn’t know",
-    body: "If a question isn’t covered, Foggy says so, doesn’t guess, and logs it for your care team.",
+    body: "If a question isn’t covered, Foggy says so, doesn’t guess, and offers to contact your care team. Nothing is sent without your OK.",
   },
   {
     icon: Pill,
@@ -20,7 +20,7 @@ const PROMISES = [
   {
     icon: Siren,
     title: "Red flags skip the AI",
-    body: "Chest pain or trouble breathing gets an immediate “call 911” and alerts the team.",
+    body: "Chest pain, trouble breathing, heavy bleeding or fainting gets an immediate “Call 911 now.” The alert also lands in your care team’s queue.",
   },
   {
     icon: UsersRound,
@@ -54,12 +54,16 @@ export function OurPromise() {
               <FoggyAvatar decorative />
               <div className="flex flex-col items-start gap-1.5">
                 <p className="max-w-[90%] rounded-[1.25rem] rounded-bl-md bg-white px-4 py-2.5 text-[0.95rem] text-ink ring-1 ring-line">
-                  That isn&rsquo;t in your care plan, so I won&rsquo;t guess. I&rsquo;ve sent your question to your care team.
+                  Your care plan does not cover that question. Would you like to contact your medical team?
                 </p>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-pale px-2.5 py-1 text-xs font-bold text-brand-cyan-strong">
-                  <Send className="size-3.5" />
-                  Sent to your care team
-                </span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-brand-cyan px-3.5 py-1.5 text-sm font-bold text-white">
+                    Yes, message my care team
+                  </span>
+                  <span className="rounded-full bg-white px-3.5 py-1.5 text-sm font-bold text-ink-soft ring-1 ring-line">
+                    No thanks
+                  </span>
+                </div>
               </div>
             </div>
           </div>

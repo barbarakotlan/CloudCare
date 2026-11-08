@@ -4,11 +4,6 @@
             "type": "webhook",
             "config": "tool_configs/ask_cloudcare.json",
             "id": "tool_8601m6w5f8s1etwrjnc7dg8rzxtc"
-        },
-        {
-            "type": "webhook",
-            "config": "tool_configs/log_check_in.json",
-            "id": "tool_3501m6w5fgqne41t5f26g32sk2mn"
         }
     ]
 }

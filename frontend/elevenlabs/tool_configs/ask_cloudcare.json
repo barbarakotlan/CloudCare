@@ -1,9 +1,11 @@
 {
     "type": "webhook",
     "name": "ask_cloudcare",
-    "description": "Ask the CloudCare care-plan service a question for the signed-in patient. Call this for ANY question about the patient's recovery, medicines, wound or incision, activity, symptoms, pain, swelling, diet, or appointments. Pass the patient's question in their own words. The reply in message.content is the answer from the patient's own care plan; say it back in plain spoken words and never add facts. If escalated is true, the care team has been told about the question.",
+    "description": "Only for signed-in patients (patient_mode signed_in); never call it in a demo call. Sends the patient's words for this turn to CloudCare and returns Foggy's reply. Call it on every turn that is not small talk, including short answers like yes, no, or a number to a question you just asked, and check-in answers. CloudCare holds the patient's care plan and the conversation state and decides the reply. Say message.content back as it is.",
     "response_timeout_secs": 120,
     "pre_tool_speech": "auto",
+    "tool_call_sound": null,
+    "tool_call_sound_behavior": "auto",
     "interruption_mode": "allow",
     "execution_mode": "immediate",
     "tool_error_handling_mode": "auto",
@@ -18,7 +20,7 @@
         },
         "request_body_schema": {
             "type": "object",
-            "description": "The patient's question for the care-plan service.",
+            "description": "The patient's words for this turn.",
             "required": [
                 "message",
                 "source"
@@ -26,7 +28,7 @@
             "properties": {
                 "message": {
                     "type": "string",
-                    "description": "The patient's question, in their own words, as one short sentence. Do not add details the patient did not say."
+                    "description": "Exactly what the patient just said, unchanged. Do not shorten, explain, or add anything. A one-word reply like yes or 4 is sent as that word."
                 },
                 "source": {
                     "type": "string",
@@ -38,9 +40,7 @@
             "mode": "allow",
             "filters": [
                 "message.content",
-                "message.answered_from_plan",
-                "message.red_flag",
-                "escalated"
+                "route"
             ]
         }
     }

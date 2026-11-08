@@ -61,27 +61,35 @@ With `NEXT_PUBLIC_AUTH_PROVIDER=supabase`:
 
 Foggy's voice is an ElevenLabs agent, defined as config in `elevenlabs/` (agent id `agent_4701m6w1ey4demdt24zb8ngs4zac`):
 
-- `elevenlabs/agent_configs/foggy.json`: system prompt (kind-nurse tone, under three sentences, never changes a dose, 911 for chest pain, trouble breathing, heavy bleeding or fainting, four-question check-in), first message `Hi {{patient_name}}…`, LLM `gemini-3.5-flash` (temperature 0), voice "Anna- Final" (`tH0OHWA5hSMw20lI7KDL`, speed 0.9), and `tool_ids` for the two server tools below.
-- `elevenlabs/tool_configs/*.json` + `elevenlabs/tools.json`: the server (webhook) tools, so voice and text Foggy share one brain, the backend:
+Voice Foggy is a thin client of the backend: for a signed-in patient, every care-related turn goes to the same `POST /chat` the text chat uses, so routing, consent offers, check-in state and the 911 rule live in one place (`docs/foggy-policy.md`).
+
+- `elevenlabs/agent_configs/foggy.json`: the system prompt, LLM `gemini-3.5-flash` (temperature 0), voice "Anna- Final" (`tH0OHWA5hSMw20lI7KDL`, speed 0.9), and one server tool. The prompt:
+  - signed in: calls `ask_cloudcare` with the patient's exact words on every turn that is not small talk (questions, symptoms, medicines, check-in answers, and yes/no or a number answering Foggy's last question) and says `message.content` as it is, only reading "911" as "nine one one" and numbers and units as words. It never adds facts and never says anything was sent unless the reply says so;
+  - handles small talk itself in one warm sentence, with no tool and no contact offer: hello, thanks, okay, will do, sounds good, hold on, goodbye;
+  - demo (and a turn whose tool call fails): answers from the embedded demo plan for Jordan with the policy wording: at most two sentences, "Call nine one one now. I can't place emergency calls." first for emergencies, "Your care plan does not cover that. Would you like to contact your medical team?" for out-of-scope questions, the dose-change refusal, and on "yes" "This is a demo, so no message was sent. In the live app, this would go to your medical team." (after a failed tool call: "I couldn't send the message. Please call your medical team."). It never says the care team was notified;
+  - phone calls: the agent's own first message is empty, so a call starts silently. A call-screening assistant asking who is calling gets "This is Foggy from Dr. Patel's care team, calling for {{patient_name}}'s recovery check-in." and Foggy then waits (`skip_turn`) for a real hello; a voicemail greeting triggers `voicemail_detection`, which leaves a one-sentence message and hangs up; a real hello gets the greeting and "Is now a good time?", and a yes starts the check-in through `/chat`. Goodbyes end the call (`end_call`).
+- Built-in system tools on the agent: `end_call`, `skip_turn`, `voicemail_detection` (with the voicemail message).
+- `elevenlabs/tool_configs/ask_cloudcare.json` + `elevenlabs/tools.json`: the one server (webhook) tool:
 
   | Tool | Request | What the agent reads back |
   |---|---|---|
-  | `ask_cloudcare` | `POST https://cloudcare-api-q4zg.onrender.com/chat`, body `{message: <the question>, source: "voice"}` | `message.content` (said back in plain words, no added facts), `answered_from_plan`, `red_flag`, `escalated` |
-  | `log_check_in` | `POST https://cloudcare-api-q4zg.onrender.com/symptoms`, body `{pain_level, shortness_of_breath, swelling, nausea, wound_redness, wound_drainage, mobility_level, free_text, source: "voice"}` | `risk.risk_level`, `escalated` (Foggy says whether the care team was alerted) |
+  | `ask_cloudcare` | `POST https://cloudcare-api-q4zg.onrender.com/chat`, body `{message: <the patient's exact words>, source: "voice"}` | `message.content` (said as is), `route` |
 
-  Both send `Authorization` from the `secret__patient_auth` dynamic variable and wait up to 120 s (Render's free tier can take ~50 s to wake).
+  It sends `Authorization` from the `secret__patient_auth` dynamic variable and waits up to 120 s (Render's free tier can take ~50 s to wake). No tool sound plays while it waits; pre-tool speech is `auto` (a short "One moment." only when calls have been slow). The old `log_check_in` tool is gone: voice check-ins run through `/chat` like text check-ins.
 - `elevenlabs/agents.json`: maps the config file to the agent id.
-- The agent is public (no signed URL) and only accepts browsers from `localhost:3000`, `cloudcare.icu` and `www.cloudcare.icu`. The browser connects with just `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` over WebRTC (`src/components/voice/VoiceSession.tsx`).
+- The agent is public (no signed URL) and only accepts browsers from `localhost:3000`, `cloudcare.icu` and `www.cloudcare.icu`. The browser connects with just `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` over WebRTC (`src/components/voice/VoiceSession.tsx`) and sends its own greeting, "Hi {name}, this is Foggy, your recovery helper. How are you feeling today?", through the `first_message` override (the only prompt-level override the agent allows).
 
 Dynamic variables, set per call by `VoiceSession.tsx` (placeholders in `foggy.json` make a call without them behave like the demo):
 
 | Variable | Signed-in patient | Anyone else (landing page, clinicians) |
 |---|---|---|
 | `patient_name` | first name from the CloudCare session | `Jordan` |
-| `patient_mode` | `signed_in` → Foggy calls the tools | `demo` → Foggy answers from the demo plan embedded in the prompt, no tools |
+| `patient_mode` | `signed_in` → Foggy relays turns to `/chat` | `demo` → Foggy answers from the demo plan embedded in the prompt, no tools |
 | `secret__patient_auth` | `Bearer <CloudCare access token>` | `Bearer demo` |
 
-The `secret__` prefix makes ElevenLabs bind the value only to tool headers: it is never sent to the language model and is redacted in stored conversations. A header written as a plain string such as `"Bearer {{token}}"` is not templated (the backend gets the literal text and returns 401), so the header uses the `{"variable_name": "secret__patient_auth"}` form and the browser sends the whole `Bearer …` value. If a tool call fails, Foggy falls back to the embedded demo plan for Jordan and otherwise suggests texting Foggy or calling the care team.
+The `secret__` prefix makes ElevenLabs bind the value only to tool headers: it is never sent to the language model and is redacted in stored conversations. A header written as a plain string such as `"Bearer {{token}}"` is not templated (the backend gets the literal text and returns 401), so the header uses the `{"variable_name": "secret__patient_auth"}` form and the browser sends the whole `Bearer …` value. Phone calls placed by the backend (`backend/app/outreach/calls.py`) send the same three variables, with a short-lived token made for the call.
+
+The conversation state (a pending offer to message the care team, check-in progress) is stored per patient on the backend, so a voice call and the text chat share it; two people testing with the same demo account at the same time will see each other's state.
 
 To change Foggy, edit the JSON and push it (the CLI reads `ELEVENLABS_API_KEY` from the environment; it lives in `.env.local` and never goes in a `NEXT_PUBLIC_` variable):
 

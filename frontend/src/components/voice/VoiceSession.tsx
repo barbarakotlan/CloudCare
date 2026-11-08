@@ -30,6 +30,14 @@ function voiceVariables(): Record<string, string> {
   return { patient_name: "Jordan", patient_mode: "demo", secret__patient_auth: "Bearer demo" };
 }
 
+/**
+ * The agent itself starts phone calls silently (the person, a call-screening assistant, or
+ * voicemail speaks first), so a web call brings its own opening line.
+ */
+function webGreeting(name: string): string {
+  return `Hi ${name}, this is Foggy, your recovery helper. How are you feeling today?`;
+}
+
 export function VoiceSession({ agentId }: { agentId: string }) {
   return (
     <ConversationProvider>
@@ -80,7 +88,13 @@ function VoiceSessionInner({ agentId }: { agentId: string }) {
       return;
     }
     setRequestingMic(false);
-    startSession({ agentId, connectionType: "webrtc", dynamicVariables: voiceVariables() });
+    const dynamicVariables = voiceVariables();
+    startSession({
+      agentId,
+      connectionType: "webrtc",
+      dynamicVariables,
+      overrides: { agent: { firstMessage: webGreeting(dynamicVariables.patient_name) } },
+    });
   }
 
   const label =

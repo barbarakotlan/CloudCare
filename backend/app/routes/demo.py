@@ -2,8 +2,10 @@
 
 Everyone who tries the demo signs in as the same patient, so this clears that one
 patient's activity for everyone: chat, Foggy's conversation state, check-ins, risk
-scores, escalations, dose answers, and texts/calls history. The account, profile,
-care plan, medications, appointments and MyChart connection stay as they are.
+scores, escalations, dose answers, texts/calls history, the stored phone number and the
+MyChart connection (the login is public: the next visitor types their own number and
+connects MyChart fresh). The account, profile, care plan, medications and appointments
+stay as they are.
 The two earlier seeded check-ins are put back so the risk history is not blank.
 """
 
@@ -17,7 +19,8 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.demo_data import add_jordan_baseline_checkins
 from app.models import (
-    ChatMessage, ChatSession, Escalation, Medication, MedicationLog, OutreachLog, Patient, RiskScore, SymptomLog, User,
+    ChatMessage, ChatSession, EpicConnection, EpicOAuthState, Escalation, Medication, MedicationLog, OutreachLog,
+    Patient, RiskScore, SymptomLog, User,
 )
 from app.rate_limits import limit_demo_reset
 from app.schemas import DemoResetOut
@@ -62,12 +65,18 @@ def reset_demo_patient(
         ("chat_sessions", delete(ChatSession).where(ChatSession.patient_id == pid)),
         ("medication_logs", delete(MedicationLog).where(MedicationLog.medication_id.in_(med_ids))),
         ("outreach_log", delete(OutreachLog).where(OutreachLog.patient_id == pid)),
+        ("epic_connections", delete(EpicConnection).where(EpicConnection.user_id == patient.user_id)),
     ]
     counts: dict[str, int] = {}
     try:
         for name, stmt in statements:
             counts[name] = db.execute(stmt.execution_options(synchronize_session=False)).rowcount or 0
+        db.execute(delete(EpicOAuthState).where(EpicOAuthState.user_id == patient.user_id)
+                   .execution_options(synchronize_session=False))
         db.flush()
+        # The demo login is public, so a visitor's phone number must not linger for the next
+        # visitor to ring. Each visitor types their own.
+        patient.phone = None
         restored_count = add_jordan_baseline_checkins(db, patient)
         db.commit()
     except Exception:

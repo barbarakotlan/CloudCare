@@ -10,7 +10,7 @@ import { errorMessage } from "@/lib/api/client";
 import { getSymptoms, logSymptoms } from "@/lib/api/symptoms";
 import type { RiskLevel, SymptomIn, SymptomResult } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import { factorLabel, MOBILITY_LABEL, relativeTime, RISK_LABEL } from "@/lib/format";
+import { factorLabel, formatRiskPercent, MOBILITY_LABEL, relativeTime, RISK_LABEL } from "@/lib/format";
 import { useAsync } from "@/lib/hooks/useAsync";
 
 type Flags = Pick<SymptomIn, "wound_redness" | "wound_drainage" | "swelling" | "nausea" | "shortness_of_breath">;
@@ -295,13 +295,14 @@ function CheckInResult({
 }) {
   const { risk, escalated } = result;
   const pct = Math.round(risk.score * 100);
+  const pctLabel = formatRiskPercent(risk.score);
   return (
     <div role="status" aria-live="polite" className="flex animate-bubble-in flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={RISK_TONE[risk.risk_level]} dot className="px-3 py-1 text-sm">
           {RISK_LABEL[risk.risk_level]}
         </Badge>
-        <span className="text-sm text-brand-gray">Recovery risk score {pct}%</span>
+        <span className="text-sm text-brand-gray">Recovery risk estimate {pctLabel}</span>
         <span className="w-full text-xs text-brand-gray">
           Experimental estimate for your care team, not a diagnosis.
         </span>

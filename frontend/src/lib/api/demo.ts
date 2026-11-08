@@ -19,8 +19,32 @@ export const DEMO_RESET_LABEL = "Resets Jordan Lee's chats, alerts and check-ins
 export const resetDemoPatient = (signal?: AbortSignal) =>
   apiFetch<DemoResetOut>("/demo/reset", { method: "POST", signal });
 
-/** Longest a sign-in waits for the fresh-demo reset before going on to the dashboard. */
-export const SIGN_IN_RESET_TIMEOUT_MS = 8000;
+/**
+ * Longest a sign-in waits for the fresh-demo reset before going on to the dashboard.
+ * Generous on purpose: a sleeping server can take 10 s or more to wake up.
+ */
+export const SIGN_IN_RESET_TIMEOUT_MS = 25_000;
+
+/** sessionStorage flag: the sign-in reset did not finish, so the dashboard shows a quiet notice. */
+const RESET_MISSED_KEY = "cc_demo_reset_missed";
+
+export function noteDemoResetMissed(missed: boolean) {
+  try {
+    if (missed) window.sessionStorage.setItem(RESET_MISSED_KEY, "1");
+    else window.sessionStorage.removeItem(RESET_MISSED_KEY);
+  } catch {
+    // Storage blocked: the dashboard just won't mention it.
+  }
+}
+
+/** Whether the last sign-in reset did not finish. Read-only; clear it with `noteDemoResetMissed(false)`. */
+export function demoResetWasMissed(): boolean {
+  try {
+    return window.sessionStorage.getItem(RESET_MISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Whether signing in as this user starts a fresh demo: the shared demo patient only.

@@ -594,6 +594,9 @@ def test_demo_reset_does_not_release_call_interval():
             db.commit()
         assert client.post("/outreach/call", headers=ctx["jordan"], json={"kind": "checkin"}).status_code == 200
         assert client.post("/demo/reset", headers=ctx["jordan"]).status_code == 200
+        with TestSession() as db:  # the reset clears the phone; put it back to test the interval alone
+            db.get(Patient, ctx["jordan_id"]).phone = PHONE
+            db.commit()
         again = client.post("/outreach/call", headers=ctx["jordan"], json={"kind": "checkin"})
         assert again.status_code == 429, again.text
     finally:

@@ -4,6 +4,7 @@ import { AudioLines } from "lucide-react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
 import { DemoResetControl } from "@/components/app/DemoResetControl";
+import { DemoResetNotice } from "@/components/app/DemoResetNotice";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
 import { isEmergency, type UiMessage } from "@/components/chat/types";
@@ -61,6 +62,7 @@ export function PatientDashboard({ session }: { session: Session }) {
       <AppHeader user={session.user} />
       <main id="main" className="flex-1 bg-surface-soft">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+          <DemoResetNotice className="mb-4" />
           <GreetingBanner
             profile={profile.data}
             fallbackName={session.user.full_name}

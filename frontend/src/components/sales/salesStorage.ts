@@ -7,9 +7,11 @@ export const SALES_OPEN_EVENT = "cc:sales-open";
 
 export const BARBARA_PHOTO = "/team/barbara.png";
 
-const HIDDEN_KEY = "cc_sales_hidden";
-const HIDDEN_AT_KEY = "cc_sales_hidden_at";
-const HIDE_FOR_MS = 7 * 24 * 60 * 60 * 1000;
+/** Older builds hid the bubble for 7 days in localStorage; cleared on sight. */
+const LEGACY_HIDDEN_KEYS = ["cc_sales_hidden", "cc_sales_hidden_at"];
+
+/** Per-visit bubble memory (sessionStorage). */
+const BUBBLE_KEY = "cc_sales_bubble";
 
 const SESSION_ID_KEY = "cc_sales_session";
 const STATE_KEY = "cc_sales_state";
@@ -37,34 +39,33 @@ function session(): Storage | null {
   }
 }
 
-/** Hidden with the X: remembered for 7 days. */
-export function isHidden(): boolean {
+/**
+ * How the bubble comes back on the next page view in this visit:
+ *  - null: first view, the big "Ready to onboard" pill.
+ *  - "icon": the visitor has opened or closed the chat; show the small round icon.
+ *  - "hidden": the visitor used the tiny × on the icon; nothing until the footer link.
+ */
+export type BubbleMemory = "icon" | "hidden" | null;
+
+export function loadBubbleMemory(): BubbleMemory {
   try {
-    const s = local();
-    if (s?.getItem(HIDDEN_KEY) !== "1") return false;
-    const at = Number(s.getItem(HIDDEN_AT_KEY));
-    if (Number.isFinite(at) && at > 0 && Date.now() - at < HIDE_FOR_MS) return true;
-    s.removeItem(HIDDEN_KEY);
-    s.removeItem(HIDDEN_AT_KEY);
-    return false;
+    const l = local();
+    for (const key of LEGACY_HIDDEN_KEYS) l?.removeItem(key);
+    const v = session()?.getItem(BUBBLE_KEY);
+    return v === "icon" || v === "hidden" ? v : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function setHidden(hidden: boolean) {
+export function saveBubbleMemory(value: BubbleMemory) {
   try {
-    const s = local();
+    const s = session();
     if (!s) return;
-    if (hidden) {
-      s.setItem(HIDDEN_KEY, "1");
-      s.setItem(HIDDEN_AT_KEY, String(Date.now()));
-    } else {
-      s.removeItem(HIDDEN_KEY);
-      s.removeItem(HIDDEN_AT_KEY);
-    }
+    if (value) s.setItem(BUBBLE_KEY, value);
+    else s.removeItem(BUBBLE_KEY);
   } catch {
-    // Storage blocked: the bubble simply shows again next visit.
+    // Storage blocked: the bubble simply starts as the pill on the next page.
   }
 }
 

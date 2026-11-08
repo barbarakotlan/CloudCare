@@ -4,7 +4,7 @@ import { Info } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 export const RISK_EXPLAINER =
-  "Score from the risk model at the time of the patient's last check-in; factors are the model's top contributions (higher = pushed the score up). Not a diagnosis.";
+  "Estimate from the risk model at the patient's last check-in. Factor shares split what pushed this estimate up between the top factors; they are not risk percentages. Experimental, trained on synthetic data. Not a diagnosis.";
 
 const WIDTH = 272; // px, matches w-68
 
@@ -12,7 +12,7 @@ const WIDTH = 272; // px, matches w-68
  * Info icon that explains the risk score. Opens on hover, keyboard focus or tap.
  * The bubble is position: fixed so table scrollers and dialogs don't clip it.
  */
-export function RiskInfo({ label = "About the risk score" }: { label?: string }) {
+export function RiskInfo({ label = "About the risk estimate" }: { label?: string }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [pinned, setPinned] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);

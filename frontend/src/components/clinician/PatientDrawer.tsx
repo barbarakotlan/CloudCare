@@ -36,8 +36,10 @@ import {
   factorLabel,
   formatDate,
   formatDateTime,
+  formatRiskPercent,
   humanizeFactors,
   MOBILITY_LABEL,
+  relativeFactorWeights,
   relativeTime,
   RISK_LABEL,
   SEVERITY_LABEL,
@@ -209,6 +211,7 @@ function DrawerBody({
   const symptoms = useAsync(`symptoms:${patientId}`, (s) => getSymptoms(patientId, s));
   const chat = useAsync(`chat:${patientId}`, (s) => getChatHistory(patientId, s));
   const unanswered = chat.data ? unansweredQuestions(chat.data) : [];
+  const factorWeights = relativeFactorWeights(row?.latest_risk?.top_factors ?? []);
   const open = escalations.filter((e) => e.patient_id === patientId && e.status !== "resolved");
   const name = row?.full_name ?? profile.data?.full_name ?? "this patient";
   // Unknown (older API) counts as having one: "replace" is the safe wording.
@@ -300,28 +303,46 @@ function DrawerBody({
                     {RISK_LABEL[row.latest_risk.risk_level]}
                   </Badge>
                   <span className="text-sm text-brand-gray">
-                    Score {Math.round(row.latest_risk.score * 100)}% · model {row.latest_risk.model_version}
+                    Estimate <span className="font-semibold text-ink-soft tabular-nums">{formatRiskPercent(row.latest_risk.score)}</span>
+                    {" · "}model {row.latest_risk.model_version}
                     {riskTimeOf(row) && now !== null ? ` · from check-in ${relativeTime(riskTimeOf(row)!, now)}` : ""}
                   </span>
                 </div>
-                {row.latest_risk.top_factors.length ? (
-                  <ul className="mt-3 flex flex-col gap-2">
-                    {row.latest_risk.top_factors.map((f) => (
-                      <li key={f.feature} className="flex items-center gap-3 text-sm">
-                        <span className="w-32 shrink-0 font-semibold text-ink sm:w-40">{factorLabel(f.feature)}</span>
-                        <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
-                          <span
-                            className="block h-full rounded-full bg-brand-cyan"
-                            style={{ width: `${Math.min(100, Math.round(Math.abs(f.impact) * 250))}%` }}
-                          />
-                        </span>
-                        <span className="w-12 text-right text-xs font-bold text-brand-gray tabular-nums">
-                          {f.impact >= 0 ? "+" : "−"}
-                          {Math.abs(Math.round(f.impact * 100))}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                {factorWeights.length ? (
+                  <>
+                    <p className="mt-4 text-xs font-extrabold tracking-wide text-brand-gray uppercase">
+                      What pushes this estimate up
+                    </p>
+                    <ul className="mt-2 flex flex-col gap-2">
+                      {factorWeights.map((f) => {
+                        // One factor: no share to show (it would always be 100%).
+                        const only = factorWeights.length === 1;
+                        return (
+                          <li key={f.feature} className="flex items-center gap-3 text-sm">
+                            <span
+                              className={
+                                only
+                                  ? "shrink-0 font-extrabold whitespace-nowrap text-brand-cyan-strong"
+                                  : "w-12 shrink-0 text-right font-extrabold text-brand-cyan-strong tabular-nums"
+                              }
+                            >
+                              {only ? "Main factor" : `+${f.weight}%`}
+                            </span>
+                            <span className="w-32 shrink-0 font-semibold text-ink sm:w-40">{factorLabel(f.feature)}</span>
+                            <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
+                              <span
+                                className="block h-full rounded-full bg-brand-cyan"
+                                style={{ width: only ? "100%" : `${f.weight}%` }}
+                              />
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="mt-3 text-xs leading-relaxed text-brand-gray">
+                      Weights are relative; the model is experimental and trained on synthetic data.
+                    </p>
+                  </>
                 ) : null}
               </div>
             ) : (

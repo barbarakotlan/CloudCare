@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Callout, CounselNote, LegalPage, LegalSection, Placeholder, type TocEntry } from "@/components/legal/LegalPage";
+import { Callout, CounselNote, LegalMeta, LegalPage, LegalSection, type TocEntry } from "@/components/legal/LegalPage";
 import { SalesBubble } from "@/components/sales/SalesBubble";
 
 export const metadata: Metadata = {
@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description:
     "What information CloudCare collects, where it is stored, which service providers process it, how Foggy's answers and calls work, and the choices you have.",
 };
+
+const LAST_UPDATED = "8 November 2026";
 
 const TOC: TocEntry[] = [
   { id: "about", label: "1. About this policy" },
@@ -34,17 +36,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       toc={TOC}
-      meta={
-        <>
-          <p>
-            <span className="font-bold text-ink">Last updated:</span> 8 November 2026
-          </p>
-          <p>
-            <span className="font-bold text-ink">Effective date:</span>{" "}
-            <Placeholder>Effective date</Placeholder>
-          </p>
-        </>
-      }
+      meta={<LegalMeta updated={LAST_UPDATED} effective={LAST_UPDATED} />}
     >
       <LegalSection id="about" number={1} title="About this policy">
         <p>
@@ -53,8 +45,8 @@ export default function PrivacyPage() {
           the service works today.
         </p>
         <p>
-          CloudCare is provided by <Placeholder>Legal entity name</Placeholder> (&ldquo;CloudCare,&rdquo;
-          &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;). CloudCare is an early-stage service, so some
+          CloudCare is provided by CloudCare (&ldquo;CloudCare,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or
+          &ldquo;our&rdquo;). CloudCare is an early-stage service, so some
           features may change. When they do, we will update this page. Using CloudCare is also covered by our{" "}
           <Link href="/terms">Terms and Conditions</Link>.
         </p>
@@ -362,21 +354,15 @@ export default function PrivacyPage() {
         <p>
           We may update this policy as CloudCare changes. When we do, we will change the &ldquo;Last updated&rdquo; date
           at the top of this page, and if the changes are important we will let you know through CloudCare or by email
-          before they take effect. This policy is governed by the laws of{" "}
-          <Placeholder>Governing law and jurisdiction</Placeholder>.
+          before they take effect. This policy is governed by the laws of the State of New York.
         </p>
       </LegalSection>
 
       <LegalSection id="contact" title="Contact us">
         <p>For questions about this policy or your information:</p>
-        <ul>
-          <li>
-            <strong>Email:</strong> <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
-          </li>
-          <li>
-            <strong>Mail:</strong> <Placeholder>Mailing address</Placeholder>
-          </li>
-        </ul>
+        <p>
+          <strong>Email:</strong> <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
+        </p>
         <p>For medical questions, contact your care team. In an emergency, call 911.</p>
       </LegalSection>
     </LegalPage>

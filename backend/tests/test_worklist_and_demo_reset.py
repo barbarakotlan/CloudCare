@@ -330,7 +330,8 @@ def test_reset_as_clinician_clears_only_demo_patient_activity():
     body = res.json()
     assert body["reset"] is True
     assert set(body["counts"]) == {"chat_messages", "chat_sessions", "symptom_logs", "risk_scores", "escalations",
-                                   "medication_logs", "outreach_log"}
+                                   "medication_logs", "outreach_log", "epic_connections"}
+    assert body["counts"]["epic_connections"] == 1
     assert body["counts"]["chat_sessions"] == 1 and body["counts"]["outreach_log"] == 1
     assert body["counts"]["medication_logs"] == 1 and body["counts"]["escalations"] >= 1
     assert body["counts"]["symptom_logs"] >= 3  # two seeded + one added
@@ -362,9 +363,11 @@ def test_reset_as_clinician_clears_only_demo_patient_activity():
         }
         jordan_row = db.get(Patient, jordan)
         assert jordan_row is not None
-        # The stored phone and the MyChart link survive a reset.
-        assert jordan_row.phone == "+15551234567"
-        assert _count(db, EpicConnection, EpicConnection.user_id == jordan_row.user_id) == 1
+        # The phone and the MyChart link are cleared too: the demo login is public, so the
+        # next visitor types their own number and connects MyChart fresh (sandbox tokens
+        # expire within the hour and would otherwise show "needs reconnecting").
+        assert jordan_row.phone is None
+        assert _count(db, EpicConnection, EpicConnection.user_id == jordan_row.user_id) == 0
 
     # The worklist still works and the demo patient has a fresh low risk, no open alerts.
     row = next(r for r in client.get("/patients", headers=ctx["clinician"]).json() if r["id"] == str(jordan))

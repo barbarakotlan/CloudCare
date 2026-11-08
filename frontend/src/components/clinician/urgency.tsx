@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import type { EscalationOut, PatientRow, RiskLevel } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import { relativeTime, RISK_LABEL } from "@/lib/format";
+import { formatRiskPercent, relativeTime, RISK_LABEL } from "@/lib/format";
 
 /**
  * Two different questions, kept apart on purpose:
@@ -99,7 +99,7 @@ export function RiskModelSummary({
     <span className={cn("inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-brand-gray", className)}>
       <span className="inline-flex items-center gap-1.5 font-bold whitespace-nowrap text-ink-soft">
         <span aria-hidden="true" className={cn("size-1.5 rounded-full", RISK_DOT[risk.risk_level])} />
-        {RISK_LABEL[risk.risk_level]} · <span className="tabular-nums">{Math.round(risk.score * 100)}%</span>
+        {RISK_LABEL[risk.risk_level]} · <span className="tabular-nums">{formatRiskPercent(risk.score)}</span>
       </span>
       {info}
       {at ? (

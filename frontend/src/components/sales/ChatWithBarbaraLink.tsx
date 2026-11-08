@@ -1,8 +1,8 @@
 "use client";
 
-import { SALES_CHAT_ENABLED, SALES_OPEN_EVENT, setHidden } from "./salesStorage";
+import { saveBubbleMemory, SALES_CHAT_ENABLED, SALES_OPEN_EVENT } from "./salesStorage";
 
-/** Footer link that brings the sales chat back (even after "hide for 7 days") and opens it. */
+/** Footer link that brings the sales chat back (even after the visitor hid it) and opens it. */
 export function ChatWithBarbaraLink({ className }: { className?: string }) {
   if (!SALES_CHAT_ENABLED) return null;
   return (
@@ -10,7 +10,7 @@ export function ChatWithBarbaraLink({ className }: { className?: string }) {
       type="button"
       aria-haspopup="dialog"
       onClick={() => {
-        setHidden(false);
+        saveBubbleMemory("icon");
         window.dispatchEvent(new Event(SALES_OPEN_EVENT));
       }}
       className={className}

@@ -12,20 +12,20 @@ export type TeamMember = {
 
 export const TEAM: TeamMember[] = [
   {
-    name: "Jacob Foti",
-    role: "Co-founder",
-    photo: "jacob.png",
-    blurb:
-      "Business lead. Has helped run a company with over $50M in annual recurring revenue, and keeps CloudCare focused on what patients and anesthesia teams will actually use.",
-    linkedin: "https://www.linkedin.com/in/jacobfoti/",
-  },
-  {
     name: "Barbara Kotlan",
     role: "Co-founder",
     photo: "barbara.png",
     blurb:
       "Backend and data. RPI student with a job offer from Epic, building the FastAPI service, schema and clinician workflows.",
     linkedin: "https://www.linkedin.com/in/barbara-kotlan/",
+  },
+  {
+    name: "Jacob Foti",
+    role: "Co-founder",
+    photo: "jacob.png",
+    blurb:
+      "Business lead. Has helped run a company with over $50M in annual recurring revenue, and keeps CloudCare focused on what patients and anesthesia teams will actually use.",
+    linkedin: "https://www.linkedin.com/in/jacobfoti/",
   },
   {
     name: "Anna Kotlan",

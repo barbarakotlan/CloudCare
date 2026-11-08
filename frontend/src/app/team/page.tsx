@@ -5,7 +5,7 @@ import { TeamGrid } from "@/components/landing/TeamGrid";
 
 export const metadata: Metadata = {
   title: "The team",
-  description: "The three co-founders building CloudCare: Jacob Foti, Barbara Kotlan and Anna Kotlan.",
+  description: "The three co-founders building CloudCare: Barbara Kotlan, Jacob Foti and Anna Kotlan.",
 };
 
 export default function TeamPage() {

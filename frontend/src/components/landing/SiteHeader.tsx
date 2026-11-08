@@ -22,6 +22,13 @@ export function SiteHeader() {
           >
             Our promise
           </Link>
+          {/* Phones have no room for a menu; Team stays visible at every width. */}
+          <Link
+            href="/team"
+            className="inline-flex min-h-10 items-center rounded-full px-3 py-2 text-[0.95rem] font-bold text-ink-soft transition-colors hover:bg-surface-pale hover:text-ink sm:px-4"
+          >
+            Team
+          </Link>
           <ButtonLink href="/login" variant="secondary" size="sm" className="px-5 sm:h-10">
             Log in
           </ButtonLink>

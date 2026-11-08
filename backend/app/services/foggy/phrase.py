@@ -9,6 +9,7 @@ two sentences, "911" written as digits, and the forced emergency wording.
 
 from __future__ import annotations
 
+import random
 import re
 
 from app.services import ai_service
@@ -177,15 +178,66 @@ def checkin_question(step: str, first_checkin: bool) -> str:
     return CHECKIN_QUESTIONS[step].format(since=since)
 
 
-def operational(kind: str, name: str) -> str:
+# One-sentence social replies, several per kind so repeated turns don't sound canned.
+# "{n}" becomes ", Jordan" (or nothing when the name is unknown); "{hi}" becomes " Jordan" / " there".
+SOCIAL_REPLIES = {
+    "acknowledgment": (
+        "Sounds good{n}.",
+        "Okay, I'm here whenever you need me{n}.",
+        "Great, just let me know if anything comes up.",
+        "Perfect, I'm here if you need me{n}.",
+    ),
+    "thanks": (
+        "You're welcome{n}, I'm here whenever you need me.",
+        "Anytime{n}.",
+        "Happy to help{n}.",
+        "You're very welcome{n}.",
+    ),
+    "greeting": (
+        "Hi{hi}, how are you feeling today?",
+        "Hello{hi}, it's good to hear from you.",
+        "Hi{hi}, how is your recovery going?",
+        "Hey{hi}, how are you doing today?",
+    ),
+    "goodbye": (
+        "Take care{n}. Talk soon.",
+        "Bye for now{n}, rest well.",
+        "Take care of yourself{n}.",
+        "Talk soon{n}, take it easy.",
+    ),
+    "goodnight": (
+        "Goodnight{n}, rest well.",
+        "Sleep well{n}.",
+    ),
+    "wellbeing": (
+        "Glad to hear it{n}.",
+        "That's good to hear{n}.",
+        "I'm really glad to hear that{n}.",
+        "That's great news{n}.",
+    ),
+}
+ASIDE = "Sure, take your time."
+
+
+def social(kind: str, name: str, recent: list[str] | tuple[str, ...] = (), message: str = "") -> str:
+    """A warm one-sentence reply for a social turn, avoiding the wording used most recently."""
+    if kind == "goodbye" and re.search(r"\bnight\b|goodnight", message or "", re.IGNORECASE):
+        kind = "goodnight"
+    options = SOCIAL_REPLIES.get(kind) or SOCIAL_REPLIES["acknowledgment"]
+    known = bool(name) and name != "there"
+    filled = [o.format(n=f", {name}" if known else "", hi=f" {name}" if known else " there") for o in options]
+    used = set(recent or ())
+    fresh = [o for o in filled if o not in used] or filled
+    return random.choice(fresh)
+
+
+def operational(kind: str, name: str, recent: list[str] | tuple[str, ...] = (), message: str = "") -> str:
     if kind == "identity":
         return IDENTITY
-    if kind == "greeting":
-        return f"Hi {name}, I'm Foggy. I can explain your care plan or do a short recovery check-in."
-    if kind == "thanks":
-        return f"You're welcome, {name}."
     if kind == "ack":
-        return "Okay. Let me know if you have a question about your care plan."
+        kind = "acknowledgment"
+    if kind in SOCIAL_REPLIES or kind == "goodbye":
+        return social(kind, name, recent, message)
     return "I can explain your care plan, do a short check-in, or send a message to your care team's queue."
 
 

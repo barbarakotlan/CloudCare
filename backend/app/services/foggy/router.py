@@ -1,9 +1,12 @@
 """One Foggy turn: pre-checks, priority order, conversation state, actions, reply.
 
 The model classifies (classify.py) and phrases plan answers (phrase.py); this module decides
-and acts. Priority (docs/foggy-policy.md): EMERGENCY_911 > pending consent > CALL_SURGEON >
-REFUSE_DOSE_CHANGE > check-in > identity/capability/small talk > NOT_IN_PLAN > ANSWER_FROM_PLAN.
-Emergencies are checked before anything else, including a pending offer or a check-in.
+and acts. Priority (docs/foggy-policy.md): EMERGENCY_911 > aside ("hold on") > pending consent >
+CALL_SURGEON > REFUSE_DOSE_CHANGE > check-in > identity/capability > social turns (acknowledgment,
+thanks, greeting, goodbye, well-being) > NOT_IN_PLAN > ANSWER_FROM_PLAN.
+Emergencies are checked before anything else, including a pending offer or a check-in. Social turns
+never change the state: with an offer pending they count as an unclear answer (asked again once),
+and a goodbye counts as "no".
 """
 
 from __future__ import annotations
@@ -140,6 +143,8 @@ def _needs_classifier(ctx: _Ctx) -> bool:
     reported_emergency = any(h.reported for h in lexicon.emergency_hits(t))
     if reported_emergency:
         return True  # the model may still recognize a quotation or example
+    if lexicon.is_aside(t) or lexicon.social_kind(t):
+        return False  # whole-message social phrases; they can carry no symptom
     if ctx.pending and lexicon.yes_no(t):
         return False
     if ctx.checkin and ctx.checkin.get("awaiting") and _bare_answer(ctx) is not None:
@@ -154,6 +159,12 @@ def _decide(ctx: _Ctx) -> None:
         ctx.acts.emergency_alert(ctx.message)
         ctx.route, ctx.text = "EMERGENCY_911", phrase.EMERGENCY_FIRST
         ctx.new_pending, ctx.checkin = None, None  # 911 replaces any routine offer or check-in
+        return
+
+    if lexicon.is_aside(ctx.message):
+        # "Hold on": nothing was answered, so an offer or check-in waits exactly as it was.
+        ctx.route, ctx.text = "OPERATIONAL", phrase.ASIDE
+        ctx.new_pending = ctx.pending
         return
 
     if ctx.pending and _handle_consent(ctx):
@@ -183,23 +194,23 @@ def _decide(ctx: _Ctx) -> None:
         _start_checkin(ctx)
         return
 
-    if lexicon.asks_identity(t) or (cls and cls.asks_identity):
+    if lexicon.asks_identity(t) or (cls and (cls.asks_identity or cls.operational_kind == "identity")):
         ctx.route, ctx.text = "OPERATIONAL", phrase.IDENTITY
         return
 
-    if lexicon.asks_capability(t) or (cls and cls.topic_kind == "capability"):
+    if lexicon.asks_capability(t) or (cls and (cls.topic_kind == "capability" or cls.operational_kind == "capability")):
         ctx.route, ctx.text = "OPERATIONAL", phrase.CAPABILITY
         _offer(ctx, "Patient asked to contact the care team")
         return
 
-    talk = lexicon.small_talk(t) or (lexicon.yes_no(t) and "ack") or (
-        cls and cls.route == "OPERATIONAL" and cls.topic_kind in ("greeting", "thanks") and cls.topic_kind)
+    talk = _social(ctx)
     if talk:
         ctx.route = "OPERATIONAL"
         if ctx.checkin and ctx.checkin.get("awaiting"):
             ctx.text = "Let's finish your check-in. " + _checkin_prompt(ctx)
         else:
-            ctx.text = phrase.operational(talk, ctx.name)
+            recent = [h["content"] for h in ctx.history if h["role"] == "assistant"]
+            ctx.text = phrase.operational(talk, ctx.name, recent, t)
         return
 
     kind, matched = lexicon.out_of_scope_kind(t)
@@ -218,6 +229,31 @@ def _decide(ctx: _Ctx) -> None:
         return
 
     _answer_from_plan(ctx, kind, matched)
+
+
+def _social_only(ctx: _Ctx) -> str | None:
+    """Like _social, but without treating a bare yes/no as social (used while an offer is pending)."""
+    kind = lexicon.social_kind(ctx.message)
+    cls = ctx.cls
+    if kind is None and cls is not None and cls.route == "OPERATIONAL" and cls.operational_kind in \
+            lexicon.SOCIAL_KINDS and not cls.symptoms and not lexicon.mentions_symptom(ctx.message):
+        kind = cls.operational_kind
+    return kind
+
+
+def _social(ctx: _Ctx) -> str | None:
+    """The social kind of the message (acknowledgment, thanks, greeting, goodbye, wellbeing), or None.
+    The word lists decide first; the model's label counts only when the message names no symptom."""
+    kind = _social_only(ctx)
+    if kind:
+        return kind
+    cls = ctx.cls
+    if (cls is not None and cls.route == "OPERATIONAL" and cls.topic_kind in ("greeting", "thanks")
+            and not cls.symptoms and not lexicon.mentions_symptom(ctx.message)):
+        return cls.topic_kind
+    if lexicon.yes_no(ctx.message):
+        return "acknowledgment"  # a bare yes / no / maybe with nothing waiting for it
+    return None
 
 
 def _is_emergency(ctx: _Ctx) -> bool:
@@ -308,6 +344,11 @@ def _handle_consent(ctx: _Ctx) -> bool:
     """Answers the pending offer. False when the message is something else (offer dropped)."""
     pending = ctx.pending
     answer = lexicon.yes_no(ctx.message)
+    social = _social_only(ctx)
+    if social == "goodbye" and answer != "yes":
+        answer = "no"  # the patient is leaving: nothing is sent
+    elif social and answer != "no" and not lexicon.explicit_yes(ctx.message):
+        answer = "unclear"  # "okay", "got it", "thanks" acknowledge; they don't agree to send anything
     if answer is None and ctx.cls is not None and ctx.cls.is_consent != "n/a":
         answer = ctx.cls.is_consent
     if answer is None and ctx.cls is None and len(ctx.message.split()) <= 3 and "?" not in ctx.message:
@@ -332,7 +373,10 @@ def _handle_consent(ctx: _Ctx) -> bool:
             ctx.text = phrase.SEND_FAILED
         return True
     if answer == "no":
-        ctx.text = phrase.NOT_SENT + (resume or " Let me know if you change your mind.")
+        if social == "goodbye" and not resume:
+            ctx.text = phrase.NOT_SENT + (f" Take care, {ctx.name}." if ctx.name != "there" else " Take care.")
+        else:
+            ctx.text = phrase.NOT_SENT + (resume or " Let me know if you change your mind.")
         return True
     # unclear: ask once more, then let it go
     if not pending.get("asked_again"):

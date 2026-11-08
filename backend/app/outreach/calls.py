@@ -1,7 +1,8 @@
 """Phone calls from Foggy through ElevenLabs Agents' Twilio outbound-call API.
 
 POST {ELEVENLABS_API_BASE}/v1/convai/twilio/outbound-call, header `xi-api-key`, JSON
-{agent_id, agent_phone_number_id, to_number, conversation_initiation_client_data}.
+{agent_id, agent_phone_number_id, to_number, telephony_call_config, conversation_initiation_client_data}
+(https://elevenlabs.io/docs/api-reference/twilio/outbound-call).
 The reply is 200 {success, message, conversation_id, callSid}; success=true means
 Twilio started dialing. It does not mean the patient answered.
 
@@ -55,11 +56,40 @@ def first_name(full_name: str | None) -> str:
     return first[:40] or "there"
 
 
+def telephony_call_config(settings: OutreachSettings) -> dict:
+    """`telephony_call_config` for the outbound-call request.
+
+    ringing_timeout_secs: how long the phone rings before Twilio gives up.
+
+    twilio_machine_detection: Twilio answering-machine detection (AMD). Mode "enable" gives a
+    quick human / machine verdict and does not delay the start of the conversation. The verdict
+    is reported to ElevenLabs as an `answering_machine_detection` webhook event (turn that event
+    on in the workspace or agent webhook settings to see it per call).
+
+    Why machine verdicts never hang up: iPhone Call Screening (and Google's Call Screen on
+    Android) answers calls from unknown numbers with an automated assistant that asks who is
+    calling and why, then shows the patient a live transcript so they can decide to pick up.
+    Twilio classifies that assistant as a machine. Hanging up on it would drop exactly the calls
+    the patient would accept once they hear it is their care team, so Foggy answers the screener
+    itself (says it is calling from the care team for a recovery check-in and waits for a real
+    greeting), and on a real voicemail leaves one sentence and ends the call. Only fax lines,
+    where no person can ever answer, are hung up on.
+    """
+    config: dict = {"ringing_timeout_secs": settings.ringing_timeout_secs}
+    if settings.machine_detection:
+        config["twilio_machine_detection"] = {
+            "mode": "enable",
+            "actions": [{"action": "hang_up", "answered_by": ["fax"]}],
+        }
+    return config
+
+
 def build_payload(settings: OutreachSettings, user: User, to_number: str) -> dict:
     return {
         "agent_id": settings.elevenlabs_agent_id,
         "agent_phone_number_id": settings.elevenlabs_phone_number_id,
         "to_number": to_number,
+        "telephony_call_config": telephony_call_config(settings),
         "conversation_initiation_client_data": {
             "dynamic_variables": {
                 "patient_name": first_name(user.full_name),

@@ -64,7 +64,8 @@ ENV = {
     "ELEVENLABS_PHONE_NUMBER_ID": "phnum_test",
     "PUBLIC_APP_URL": "https://cloudcare.icu",
 }
-ALL_KEYS = list(ENV) + ["TWILIO_MESSAGING_SERVICE_SID", "OUTREACH_ALLOWED_COUNTRY_CODES", "ELEVENLABS_API_BASE"]
+ALL_KEYS = list(ENV) + ["TWILIO_MESSAGING_SERVICE_SID", "OUTREACH_ALLOWED_COUNTRY_CODES", "ELEVENLABS_API_BASE",
+                        "OUTREACH_MACHINE_DETECTION", "OUTREACH_RINGING_TIMEOUT_SECS"]
 
 
 def _env(configured: bool = True, **overrides):
@@ -400,6 +401,11 @@ def test_call_started_with_dynamic_variables():
     assert payload["agent_id"] == "agent_test"
     assert payload["agent_phone_number_id"] == "phnum_test"
     assert payload["to_number"] == PHONE
+    # Machine detection is on by default; machine verdicts (call screeners, voicemail) never hang up.
+    assert payload["telephony_call_config"] == {
+        "ringing_timeout_secs": 45,
+        "twilio_machine_detection": {"mode": "enable", "actions": [{"action": "hang_up", "answered_by": ["fax"]}]},
+    }
     variables = payload["conversation_initiation_client_data"]["dynamic_variables"]
     assert variables["patient_name"] == "Jordan" and variables["patient_mode"] == "signed_in"
     assert variables["secret__patient_auth"].startswith("Bearer ")
@@ -414,6 +420,24 @@ def test_call_started_with_dynamic_variables():
     with TestSession() as db:
         row = db.scalar(select(OutreachLog))
         assert (row.channel, row.status, row.provider_id, row.to_number_last4) == ("call", "started", "conv_123", "5678")
+
+
+def test_call_machine_detection_flag_and_ring_time():
+    for flag in ("false", "0", "off"):
+        client, _, ctx = _setup()
+        _env(True, OUTREACH_MACHINE_DETECTION=flag, OUTREACH_RINGING_TIMEOUT_SECS="30")
+        rec = _mock(_eleven_ok)
+        assert client.post("/outreach/call", headers=ctx["patient"], json={"kind": "checkin"}).status_code == 200
+        payload = json.loads(rec.requests[0].content)
+        assert payload["telephony_call_config"] == {"ringing_timeout_secs": 30}, flag
+
+    _env(True, OUTREACH_MACHINE_DETECTION="true", OUTREACH_RINGING_TIMEOUT_SECS="999")
+    settings = outreach_config.get_settings()
+    assert settings.machine_detection is True and settings.ringing_timeout_secs == 120  # clamped
+    _env(True, OUTREACH_RINGING_TIMEOUT_SECS="soon")
+    assert outreach_config.get_settings().ringing_timeout_secs == 45
+    _env(True, OUTREACH_MACHINE_DETECTION=" ")  # blank = default (on)
+    assert outreach_config.get_settings().machine_detection is True
 
 
 def test_call_refused_by_twilio_is_failed():

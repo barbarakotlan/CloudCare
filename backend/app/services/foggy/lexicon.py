@@ -362,11 +362,6 @@ CAPABILITY = _rx(
     r"\bwhat can you do\b",
     r"\bhow can you help\b",
 )
-GREETING = re.compile(r"^(?:hi|hello|hey|hiya|good (?:morning|afternoon|evening)|yo)\b[\s!,.a-z]{0,20}$")
-THANKS = re.compile(r"^(?:ok(?:ay)?[, ]*)?(?:thanks|thank you|thx|ty|thanks so much|thank you so much)\b[\s!,.a-z]{0,25}$")
-ACK = re.compile(r"^(?:ok|okay|got it|cool|great|alright|all right|sounds good|good|perfect|k)[.!]*$")
-
-
 def asks_identity(text: str) -> bool:
     t = normalize(text)
     return any(p.search(t) for p in IDENTITY)
@@ -377,15 +372,106 @@ def asks_capability(text: str) -> bool:
     return any(p.search(t) for p in CAPABILITY)
 
 
-def small_talk(text: str) -> str | None:
-    t = normalize(text)
-    if GREETING.match(t):
-        return "greeting"
-    if THANKS.match(t):
-        return "thanks"
-    if ACK.match(t):
-        return "ack"
+# ---- social turns: acknowledgments, thanks, greetings, goodbyes, well-being --------------
+# Matched against the whole message (punctuation removed), so a message that says anything
+# more than these phrases ("I'm fine but my calf hurts") is never treated as social.
+
+SOCIAL_KINDS = ("acknowledgment", "thanks", "greeting", "goodbye", "wellbeing")
+
+_GREET = (r"(?:hi|hello|hey|hiya|heya|howdy|yo|good (?:morning|afternoon|evening|day)|morning|afternoon|evening|"
+          r"how are you(?: doing)?(?: today)?|how's it going|hows it going|are you there|you there|"
+          r"is anyone there|anyone there|is this foggy|it's me|its me)")
+_THANKS = (r"(?:thanks|thank you|thx|ty|thanks so much|thank you so much|thanks a lot|thanks a bunch|"
+           r"thank you very much|thanks again|thank you again|many thanks|much appreciated|"
+           r"(?:i )?appreciate (?:it|that|you|it so much|that so much))")
+_ACK = (r"(?:will do|i will|i'll do that|ill do that|i'll do it|i will do that|okay|ok|okey|okie|k|kk|got it|"
+        r"gotcha|sounds good|sounds great|sure|sure thing|alright|all right|cool|great|perfect|good|nice|"
+        r"awesome|noted|understood|makes sense|that makes sense|i see|i understand|no problem|no worries|"
+        r"yes please|good to know|that helps|that's helpful|thats helpful|that's great|that's good|"
+        r"okay then|ok then|right|yep|yup|fair enough|of course)")
+_BYE = (r"(?:bye|bye bye|goodbye|good bye|bye for now|good night|goodnight|night|night night|talk later|"
+        r"talk to you later|talk soon|talk to you soon|ttyl|see you|see ya|see you later|later|catch you later|"
+        r"(?:that's all|thats all|that's it|thats it|that is all|that's everything|that's all i needed)"
+        r"(?: for (?:now|today|tonight))?|"
+        r"i'm done|im done|gotta go|i have to go|i've got to go|i got to go|"
+        r"have a (?:good|great|nice) (?:day|night|one|evening|afternoon)|take care)")
+_PHRASE = rf"(?:{_GREET}|{_THANKS}|{_ACK}|{_BYE})(?: foggy| there)?"
+SOCIAL_PHRASES = re.compile(rf"^{_PHRASE}(?: {_PHRASE})*$")
+_HAS_BYE = re.compile(rf"(?:^| ){_BYE}(?: |$)")
+_HAS_THANKS = re.compile(rf"(?:^| ){_THANKS}(?: |$)")
+_HAS_GREET = re.compile(rf"(?:^| ){_GREET}(?: |$)")
+
+# Brief positive well-being updates. Only the closed vocabulary below may appear, so a
+# denial ("not good"), a symptom, or a "but" clause never matches.
+_WB_LEAD = (r"(?:i'm|im|i am|i've been|ive been|i have been|been|i feel|i felt|i'm feeling|im feeling|feeling|feel|"
+            r"doing|i'm doing|im doing|things are|things are going|everything's|everything is|all is|it's|its|it is|"
+            r"it's been|today is|today's|recovery is going|my recovery is going|it's going|going|still|overall|so far|"
+            r"honestly|actually|today|i think i'm|i think)")
+_WB_ADV = r"(?:really|pretty|very|so|quite|much|a lot|a little|a bit|way|super|totally|mostly|just|all|doing|feeling)"
+_WB_POS = (r"(?:fine|good|great|well|better|okay|ok|alright|all right|amazing|wonderful|fantastic|excellent|"
+           r"not bad|not too bad|stronger|comfortable|rested|good overall|no complaints|all good)")
+_WB_TAIL = (r"(?:today|now|right now|this morning|tonight|this afternoon|this evening|so far|overall|honestly|"
+            r"actually|again|than yesterday|lately|these days|thanks|thank you|thanks for asking|foggy)")
+_WB_STATEMENT = (rf"(?:{_WB_LEAD} )*(?:{_WB_ADV} )*{_WB_POS}"
+                 rf"|(?:i )?(?:had|have had|i've had|ive had) (?:a )?(?:really |pretty |very )?"
+                 r"(?:good|great|nice|restful|decent|ok|okay|calm|quiet|peaceful) "
+                 r"(?:night|day|sleep|morning|night's sleep|nights sleep|rest|evening)"
+                 r"|(?:i )?slept (?:really |pretty |very )?(?:well|good|fine|great|ok|okay|better|through the night)")
+WELLBEING = re.compile(rf"^(?P<lead>(?:{_PHRASE} )*)(?:{_WB_STATEMENT})(?: {_WB_TAIL})*(?P<tail>(?: {_PHRASE})*)$")
+SYMPTOM_WORDS = re.compile(
+    r"\b(?:pain|painful|hurt|hurts|hurting|sore|ache|aches|aching|swell|swelling|swollen|chest|breath|breathe|"
+    r"breathing|bleed|bleeding|blood|fever|temperature|red|redness|drain|drainage|pus|numb|numbness|tingl\w*|"
+    r"fall|fell|fallen|dizzy|nause\w*|vomit\w*|throw(?:ing)? up|faint\w*|passed out|calf|cough\w*|itch\w*|rash|"
+    r"chills|sweat\w*|cramp\w*|stiff|weak|tired|exhausted|cold|hot|warm|sick|infect\w*|incision|wound|stitches)\b"
+)
+ASIDE = re.compile(
+    r"^(?:(?:ok|okay|um|uh|oh|sorry) )?(?:hold on|hang on|one sec|one second|one moment|one minute|just a sec|"
+    r"just a second|just a moment|just a minute|a moment|wait|wait a sec|wait a second|wait a minute|"
+    r"give me a sec|give me a second|give me a minute|give me a moment|let me think|let me check|let me see|"
+    r"brb|be right back)(?: please| foggy)*$"
+)
+# Words that make a short reply an explicit "yes" to a pending offer. Other acknowledgments
+# ("okay", "got it", "sounds good", "thanks") do not, so they are treated as unclear.
+EXPLICIT_YES = re.compile(r"\b(?:yes|yeah|yep|yup|ya|yea|sure|please|definitely|absolutely|go ahead|do it|send it|"
+                          r"of course)\b")
+
+
+def _plain(text: str) -> str:
+    return re.sub(r"\s+", " ", _strip(text)).strip()
+
+
+def social_kind(text: str) -> str | None:
+    """'acknowledgment' | 'thanks' | 'greeting' | 'goodbye' | 'wellbeing' for a purely social
+    message, else None. A message that mentions any symptom word is never social."""
+    t = _plain(text)
+    if not t or SYMPTOM_WORDS.search(t):
+        return None
+    if SOCIAL_PHRASES.match(t):
+        if _HAS_BYE.search(t):
+            return "goodbye"
+        if _HAS_THANKS.search(t):
+            return "thanks"
+        if _HAS_GREET.search(t):
+            return "greeting"
+        return "acknowledgment"
+    wb = WELLBEING.match(t)
+    if wb:
+        # "Doing well, bye!" is a goodbye; "had a good night" is not.
+        return "goodbye" if _HAS_BYE.search(wb.group("tail").strip()) else "wellbeing"
     return None
+
+
+def mentions_symptom(text: str) -> bool:
+    return bool(SYMPTOM_WORDS.search(_plain(text)))
+
+
+def is_aside(text: str) -> bool:
+    """"Hold on", "one sec": the patient is not answering yet."""
+    return bool(ASIDE.match(_plain(text)))
+
+
+def explicit_yes(text: str) -> bool:
+    return bool(EXPLICIT_YES.search(_plain(text)))
 
 
 # ---- consent and check-in answers --------------------------------------------------------

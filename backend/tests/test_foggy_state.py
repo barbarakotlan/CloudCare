@@ -374,6 +374,141 @@ def test_call_request_explains_real_capability():
     assert r["offer_contact"] is True and _escalations(TestSession, ctx, "patient_request") == []
 
 
+# ---- social turns: acknowledgments, thanks, greetings, goodbyes, well-being ------------------
+
+def _replies(kind):
+    return {o.format(n=", Jordan", hi=" Jordan") for o in phrase.SOCIAL_REPLIES[kind]}
+
+
+def _assert_social(r, kind):
+    assert r["route"] == "OPERATIONAL", r
+    assert r["message"]["content"] in _replies(kind), r["message"]["content"]
+    assert r["offer_contact"] is False and r["pending_action"] is None
+    assert r["action_result"] is None and r["escalated"] is False and r["checkin"] is None
+    assert r["message"]["answered_from_plan"] is None and r["message"]["red_flag"] is False
+
+
+def test_acknowledgment_is_not_out_of_scope():
+    client, TestSession, ctx = _setup()
+    before = len(_escalations(TestSession, ctx))
+    for msg in ("Will do", "Got it.", "sounds good", "No problem!", "yes please"):
+        _assert_social(_say(client, ctx, msg), "acknowledgment")
+    assert len(_escalations(TestSession, ctx)) == before
+    with TestSession() as db:
+        session = db.get(ChatSession, ctx["patient_id"])
+        assert session.pending_action is None and session.checkin_state is None
+
+
+def test_thanks_greeting_goodbye_wellbeing():
+    client, TestSession, ctx = _setup()
+    before = len(_escalations(TestSession, ctx))
+    _assert_social(_say(client, ctx, "Thanks Foggy"), "thanks")
+    _assert_social(_say(client, ctx, "I appreciate it!"), "thanks")
+    _assert_social(_say(client, ctx, "Hello?"), "greeting")
+    _assert_social(_say(client, ctx, "hey Foggy"), "greeting")
+    _assert_social(_say(client, ctx, "I'm doing fine today"), "wellbeing")
+    _assert_social(_say(client, ctx, "feeling better today"), "wellbeing")
+    _assert_social(_say(client, ctx, "had a good night"), "wellbeing")
+    _assert_social(_say(client, ctx, "Okay, that's all for today, bye!"), "goodbye")
+    r = _say(client, ctx, "goodnight")
+    assert r["route"] == "OPERATIONAL" and r["message"]["content"] in _replies("goodnight")
+    assert len(_escalations(TestSession, ctx)) == before
+
+
+def test_social_replies_vary():
+    client, _, ctx = _setup()
+    first = _say(client, ctx, "thanks")["message"]["content"]
+    second = _say(client, ctx, "thanks")["message"]["content"]
+    assert first != second and {first, second} <= _replies("thanks")
+    assert all(len(phrase.split_sentences(o)) <= 2 for kind in phrase.SOCIAL_REPLIES for o in _replies(kind))
+
+
+def test_social_skips_the_model():
+    client, _, ctx = _setup()
+    calls = []
+    classify_mod.classify_message = lambda message, *rest: calls.append(message) or _not_in_plan()
+    _assert_social(_say(client, ctx, "Will do"), "acknowledgment")  # a model "not in plan" can't override it
+    assert calls == []
+    assert _say(client, ctx, "Can I eat sushi?")["route"] == "NOT_IN_PLAN"
+    assert calls == ["Can I eat sushi?"]
+
+
+def test_wellbeing_with_a_symptom_is_not_social():
+    client, TestSession, ctx = _setup()
+    r = _say(client, ctx, "I'm fine but I can't breathe")
+    assert r["route"] == "EMERGENCY_911"
+    assert r["message"]["content"] == "Call 911 now. I can't place emergency calls."
+    assert len(_escalations(TestSession, ctx, "red_flag")) == 1
+    r = _say(client, ctx, "I'm doing fine but my calf is swollen")
+    assert r["route"] == "CALL_SURGEON" and r["offer_contact"] is True
+
+
+def test_model_wellbeing_label_needs_no_symptom():
+    calm = "Honestly I'm feeling a whole lot more like myself than yesterday"
+    sore = "Doing alright overall, the knee is sore when I bend it though"
+    label = Classification(route="OPERATIONAL", topic_kind="other", operational_kind="wellbeing")
+    client, _, ctx = _setup({calm: label, sore: label})
+    _assert_social(_say(client, ctx, calm), "wellbeing")
+    assert _say(client, ctx, sore)["message"]["content"] not in _replies("wellbeing")
+
+
+def test_model_acknowledgment_label_is_not_out_of_scope():
+    msg = "alrighty, I'll keep that in mind"
+    client, _, ctx = _setup({msg: Classification(route="OPERATIONAL", topic_kind="other",
+                                                 operational_kind="acknowledgment")})
+    _assert_social(_say(client, ctx, msg), "acknowledgment")
+
+
+def test_acknowledgment_with_pending_offer_asks_again_once():
+    client, TestSession, ctx = _setup({"Can I eat sushi?": _not_in_plan()})
+    _say(client, ctx, "Can I eat sushi?")
+    first = _say(client, ctx, "Will do")
+    assert first["message"]["content"].startswith("Just to check")
+    assert first["pending_action"] is not None and first["action_result"] is None
+    second = _say(client, ctx, "Okay, got it")
+    assert second["pending_action"] is None and "won't send" in second["message"]["content"]
+    assert _say(client, ctx, "yes")["action_result"] is None
+    assert _escalations(TestSession, ctx, "patient_request") == []
+
+
+def test_okay_and_thanks_are_not_consent():
+    for reply in ("okay", "Thanks!", "sounds good"):
+        client, TestSession, ctx = _setup({"Can I eat sushi?": _not_in_plan()})
+        _say(client, ctx, "Can I eat sushi?")
+        r = _say(client, ctx, reply)
+        assert r["action_result"] is None and r["message"]["content"].startswith("Just to check"), reply
+        assert _escalations(TestSession, ctx, "patient_request") == []
+
+
+def test_aside_keeps_the_offer_pending():
+    client, TestSession, ctx = _setup({"Can I eat sushi?": _not_in_plan()})
+    _say(client, ctx, "Can I eat sushi?")
+    r = _say(client, ctx, "hold on")
+    assert r["route"] == "OPERATIONAL" and r["message"]["content"] == phrase.ASIDE
+    assert r["pending_action"] is not None and r["action_result"] is None
+    r = _say(client, ctx, "yes")
+    assert r["action_result"]["status"] == "sent"
+    assert len(_escalations(TestSession, ctx, "patient_request")) == 1
+
+
+def test_aside_keeps_the_checkin():
+    client, _, ctx = _setup()
+    _say(client, ctx, "Can we do my recovery check-in?")
+    r = _say(client, ctx, "one sec")
+    assert r["message"]["content"] == phrase.ASIDE
+    r = _say(client, ctx, "3")
+    assert r["checkin"]["step"] == 2 and r["checkin"]["answers"]["pain"] == 3
+
+
+def test_goodbye_with_pending_offer_sends_nothing():
+    client, TestSession, ctx = _setup({"Can I eat sushi?": _not_in_plan()})
+    _say(client, ctx, "Can I eat sushi?")
+    r = _say(client, ctx, "bye")
+    assert r["pending_action"] is None and r["action_result"] is None
+    assert r["message"]["content"] == "Okay, I won't send anything. Take care, Jordan."
+    assert _escalations(TestSession, ctx, "patient_request") == []
+
+
 # ---- enforcement -----------------------------------------------------------------------------
 
 def test_two_sentence_cap():

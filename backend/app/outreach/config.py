@@ -20,9 +20,28 @@ HTTP_TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 SMS_INTERVAL_SECONDS = 60
 CALL_INTERVAL_SECONDS = 120
 
+# How long an outbound call rings before giving up (ElevenLabs' default is 60 s).
+DEFAULT_RINGING_TIMEOUT_SECS = 45
+RINGING_TIMEOUT_RANGE = (10, 120)
+
 
 def _env(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = _env(name).lower()
+    if not value:
+        return default
+    return value not in ("0", "false", "no", "off")
+
+
+def _env_int(name: str, default: int, lo: int, hi: int) -> int:
+    try:
+        value = int(_env(name))
+    except ValueError:
+        return default
+    return min(max(value, lo), hi)
 
 
 @dataclass(frozen=True)
@@ -38,6 +57,9 @@ class OutreachSettings:
     public_app_url: str
     # Country calling codes CloudCare may text or call, e.g. ("1",). Empty = any.
     allowed_country_codes: tuple[str, ...]
+    # Outbound calls: Twilio answering-machine detection on/off, and ring time in seconds.
+    machine_detection: bool = True
+    ringing_timeout_secs: int = DEFAULT_RINGING_TIMEOUT_SECS
 
     @property
     def sms_missing(self) -> list[str]:
@@ -90,6 +112,9 @@ def get_settings() -> OutreachSettings:
         elevenlabs_api_base=_env("ELEVENLABS_API_BASE", ELEVENLABS_API_BASE).rstrip("/"),
         public_app_url=_env("PUBLIC_APP_URL", DEFAULT_PUBLIC_APP_URL).rstrip("/"),
         allowed_country_codes=codes,
+        machine_detection=_env_flag("OUTREACH_MACHINE_DETECTION", True),
+        ringing_timeout_secs=_env_int("OUTREACH_RINGING_TIMEOUT_SECS", DEFAULT_RINGING_TIMEOUT_SECS,
+                                      *RINGING_TIMEOUT_RANGE),
     )
 
 

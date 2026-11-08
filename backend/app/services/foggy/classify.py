@@ -22,6 +22,7 @@ TOPIC_KINDS = ("plan_question", "missed_dose", "unlisted_medication", "dose_inte
                "second_opinion", "work_or_travel", "family_member", "non_medical", "feelings", "other_medical",
                "identity", "capability", "greeting", "thanks", "consent_answer", "checkin_answer", "dose_change",
                "symptom_report", "checkin_request", "other")
+OPERATIONAL_KINDS = ("acknowledgment", "thanks", "greeting", "goodbye", "wellbeing", "identity", "capability", "none")
 
 # Router names for classifier symptom labels.
 SYMPTOM_TO_SIGN = {
@@ -36,6 +37,7 @@ SCHEMA = {
     "type": "object",
     "properties": {
         "route": {"type": "string", "enum": list(ROUTES)},
+        "operational_kind": {"type": "string", "enum": list(OPERATIONAL_KINDS)},
         "topic_kind": {"type": "string", "enum": list(TOPIC_KINDS)},
         "topic": {"type": "string"},
         "is_actual_report": {"type": "boolean"},
@@ -56,7 +58,7 @@ SCHEMA = {
         "about_other_person": {"type": "boolean"},
         "asks_identity": {"type": "boolean"},
     },
-    "required": ["route", "topic_kind", "topic", "is_actual_report", "symptoms", "temperature_f", "is_consent",
+    "required": ["route", "operational_kind", "topic_kind", "topic", "is_actual_report", "symptoms", "temperature_f", "is_consent",
                  "checkin_answers", "about_other_person", "asks_identity"],
 }
 
@@ -84,9 +86,13 @@ ROUTES (pick one; when several apply, the earliest in this list wins; OPERATIONA
    and anything unrelated to recovery (jokes, sports, weather).
 6. ANSWER_FROM_PLAN: a question the care plan explicitly answers, including reading back a medicine instruction
    exactly as written, and "what should I do if ..." questions the plan answers.
-OPERATIONAL: greetings, thanks, acknowledgments, yes/no/unclear replies to Foggy's last question, check-in
-   answers, questions about who or what Foggy is (doctor? nurse? human? AI?), and questions about what Foggy
-   can do (call, text, message the care team).
+OPERATIONAL: social turns and replies about the conversation itself: acknowledgments ("will do", "okay", "got
+   it", "sounds good"), thanks, greetings ("hi", "hello?", "hey Foggy"), goodbyes ("bye", "talk later", "that's
+   all"), brief well-being updates that name no symptom ("I'm doing fine", "feeling better today", "had a good
+   night"), yes/no/unclear replies to Foggy's last question, check-in answers, questions about who or what Foggy
+   is (doctor? nurse? human? AI?), and questions about what Foggy can do (call, text, message the care team).
+   Social turns are never NOT_IN_PLAN. A well-being update that also mentions a symptom or warning sign is not
+   social: route it by the symptom ("I'm fine but I can't breathe" is EMERGENCY_911).
 
 FIELDS
 - is_actual_report: true if the message reports something actually happening now or recently to the patient (or
@@ -104,6 +110,8 @@ FIELDS
   says a check-in question is waiting, a bare "yes", "no", or number answers that question.
 - about_other_person: the question is about someone other than the patient.
 - asks_identity: asks who or what Foggy is, or whether it is a doctor, nurse, human, or AI.
+- operational_kind: for OPERATIONAL only: acknowledgment, thanks, greeting, goodbye, wellbeing (a brief update
+  with no symptom), identity, or capability. "none" for consent and check-in answers and for every other route.
 - topic_kind: the closest label for the message.
 - topic: for NOT_IN_PLAN only, 2 to 6 plain words that complete "Your care plan doesn't cover ___", for example
   "going back to work", "taking ibuprofen", "drinking alcohol". Otherwise "".
@@ -128,12 +136,19 @@ EXAMPLES (for illustration; the patient's own plan is below)
 "Can I go back to the gym?" -> NOT_IN_PLAN, other, topic "going back to the gym"
 "I'm so worried about all this" -> NOT_IN_PLAN, feelings
 "What's the capital of France?" -> NOT_IN_PLAN, non_medical
-"Are you a real nurse?" -> OPERATIONAL, identity, asks_identity true
-"Can you call my surgeon for me?" -> OPERATIONAL, capability
+"Are you a real nurse?" -> OPERATIONAL, operational_kind identity, asks_identity true
+"Can you call my surgeon for me?" -> OPERATIONAL, operational_kind capability
+"Will do" -> OPERATIONAL, operational_kind acknowledgment
+"Thanks so much Foggy!" -> OPERATIONAL, operational_kind thanks
+"Hello? Is this Foggy?" -> OPERATIONAL, operational_kind greeting
+"Okay that's all for today, bye" -> OPERATIONAL, operational_kind goodbye
+"Honestly I'm feeling a lot better than yesterday" -> OPERATIONAL, operational_kind wellbeing
+"I'm fine but my calf is swollen" -> CALL_SURGEON, symptoms [calf_pain_or_swelling]
 "I feel kind of weird today" -> START_CHECKIN, checkin_request
 "Let's do the check-in, pain is about a 3" -> START_CHECKIN, checkin_answers.pain 3
 (STATE: check-in waiting for meds_taken) "yep" -> OPERATIONAL, checkin_answer, meds_taken yes, is_consent n/a
 (STATE: pending offer to message care team) "yes please" -> OPERATIONAL, consent_answer, is_consent yes
+(STATE: pending offer to message care team) "okay, got it" -> OPERATIONAL, acknowledgment, is_consent unclear
 (STATE: pending offer to message care team) "can I shower though?" -> ANSWER_FROM_PLAN, is_consent n/a
 """
 
@@ -150,6 +165,7 @@ class Classification:
     checkin_answers: dict = field(default_factory=dict)  # only the answers given
     about_other_person: bool = False
     asks_identity: bool = False
+    operational_kind: str = "none"
 
 
 def _state_text(state: dict) -> str:
@@ -202,6 +218,8 @@ def parse(data: dict) -> Classification:
         checkin_answers=answers,
         about_other_person=bool(data.get("about_other_person")),
         asks_identity=bool(data.get("asks_identity")),
+        operational_kind=(data.get("operational_kind") if route == "OPERATIONAL"
+                          and data.get("operational_kind") in OPERATIONAL_KINDS else "none"),
     )
 
 

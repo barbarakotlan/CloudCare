@@ -178,7 +178,10 @@ export function ClinicianDashboard({ session }: { session: Session }) {
               <h1 className="text-3xl font-black tracking-tight text-ink sm:text-4xl">
                 Dr. {session.user.full_name.replace(/^Dr\.?\s+/i, "").split(/\s+/).pop()}
               </h1>
-              <p className="text-ink-soft">Here&rsquo;s who needs you. Foggy handles the rest from each patient&rsquo;s plan.</p>
+              <p className="text-ink-soft">
+                Here&rsquo;s who needs you. Foggy answers from each patient&rsquo;s plan and offers to message you
+                when it can&rsquo;t; nothing is sent without the patient&rsquo;s OK.
+</p>
             </div>
             <DemoResetControl variant="button" onReset={onDemoReset} />
           </div>

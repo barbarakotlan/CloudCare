@@ -89,7 +89,13 @@ export function ChatPanel({
         {!historyLoading && messages.length === 0 ? (
           <div className="m-auto max-w-xs py-6 text-center text-sm text-brand-gray">
             <p className="font-bold text-ink">Ask Foggy anything about your recovery.</p>
-            <p className="mt-1">Answers come only from the care plan your clinician wrote.</p>
+            <p className="mt-1">Answers come only from the care plan your care team wrote.</p>
+            {mode === "live" ? (
+              <p className="mt-1">
+                If your plan doesn&rsquo;t cover something, Foggy offers to message your care team; nothing is sent
+                without your OK.
+              </p>
+            ) : null}
           </div>
         ) : null}
         {messages.map((m, i) => (

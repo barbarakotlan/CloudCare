@@ -99,7 +99,7 @@ export function CheckInCard({ now }: { now: number | null }) {
         description={
           last && now !== null
             ? `Last check-in ${relativeTime(last.logged_at, now)} · takes about a minute`
-            : "Takes about a minute. Your care team sees the result."
+            : "Takes about a minute. Saved to your record, where your care team can see it."
         }
       />
 

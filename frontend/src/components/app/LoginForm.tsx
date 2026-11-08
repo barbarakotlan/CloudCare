@@ -255,9 +255,9 @@ export function LoginForm() {
           <p className="text-center text-sm text-ink-soft">
             {signingUp ? "Already have an account?" : "New patient?"}{" "}
             <Button
-              variant="ghost"
+              variant="link"
               size="sm"
-              className="px-2 text-brand-cyan-strong"
+              className="px-2"
               onClick={() => switchMode(signingUp ? "signin" : "signup")}
             >
               {signingUp ? "Sign in" : "Create account"}

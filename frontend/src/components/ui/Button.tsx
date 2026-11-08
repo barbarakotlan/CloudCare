@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "soft";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "soft" | "link";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
@@ -16,6 +16,8 @@ const variants: Record<ButtonVariant, string> = {
   ghost: "text-ink-soft hover:bg-surface-pale hover:text-ink",
   danger: "bg-brand-red text-white hover:bg-brand-red-dark",
   soft: "bg-surface-pale text-brand-cyan-strong hover:bg-[#d3edf4]",
+  // Inline text action (cn() concatenates, so text color has to come from the variant, not className).
+  link: "text-brand-cyan-strong underline-offset-4 hover:bg-surface-pale hover:text-brand-cyan hover:underline",
 };
 
 const sizes: Record<ButtonSize, string> = {

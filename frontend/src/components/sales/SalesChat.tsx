@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowUp, Building2, Minus, RotateCcw, X } from "lucide-react";
+import { ArrowRight, ArrowUp, Building2, RotateCcw, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ApiError } from "@/lib/api/client";
@@ -62,16 +62,15 @@ type SendError = { kind: "generic" | "rate"; text: string };
 
 /**
  * The open chat with Barbara (an AI twin speaking as her). The conversation
- * lives in sessionStorage for the visit, so minimising or moving between
- * public pages keeps it.
+ * lives in sessionStorage for the visit, so closing it to the small icon or
+ * moving between public pages keeps it.
  */
 export function SalesChat({
   visible,
-  onMinimise,
   onClose,
 }: {
   visible: boolean;
-  onMinimise: () => void;
+  /** Collapse to the small reopen icon; the conversation stays. */
   onClose: () => void;
 }) {
   const [state, setState] = useState<ChatState>(() => loadSessionState(isChatState) ?? INITIAL_STATE);
@@ -293,11 +292,11 @@ export function SalesChat({
     }
   }
 
-  // Focus trap + Escape (minimise).
+  // Focus trap + Escape (close to the icon).
   function onPanelKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === "Escape") {
       e.stopPropagation();
-      onMinimise();
+      onClose();
       return;
     }
     if (e.key !== "Tab") return;
@@ -399,18 +398,9 @@ export function SalesChat({
         </div>
         <button
           type="button"
-          onClick={onMinimise}
-          aria-label="Minimise chat"
-          title="Minimise"
-          className="grid size-10 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-pale hover:text-ink"
-        >
-          <Minus className="size-5" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
           onClick={onClose}
-          aria-label="Close chat and hide it for 7 days"
-          title="Close and hide for 7 days"
+          aria-label="Close chat"
+          title="Close (your conversation is kept)"
           className="-mr-1 grid size-10 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-pale hover:text-ink"
         >
           <X className="size-5" aria-hidden="true" />

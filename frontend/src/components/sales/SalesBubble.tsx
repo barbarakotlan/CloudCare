@@ -1,25 +1,37 @@
 "use client";
 
-import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { MessageCircle, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
 import { cn } from "@/lib/cn";
 import { BarbaraPhoto } from "./parts";
 import "./sales.css";
 import { SalesChat } from "./SalesChat";
-import { isHidden, nextNudgeLine, SALES_CHAT_ENABLED, SALES_OPEN_EVENT, setHidden } from "./salesStorage";
+import { loadBubbleMemory, nextNudgeLine, SALES_CHAT_ENABLED, SALES_OPEN_EVENT, saveBubbleMemory } from "./salesStorage";
 
 const NUDGE_AFTER_MS = 20_000;
 const NUDGE_FOR_MS = 8_000;
-/** Room the collapsed pill needs at the bottom of the page, so it never covers the footer's last lines. */
-const FOOTER_SPACE = "5.5rem";
+/** Room the launcher needs at the bottom of the page, so it never covers the footer's last lines. */
+const FOOTER_SPACE = { pill: "5.5rem", icon: "4.5rem" } as const;
+/** Touch: holding the small icon this long shows its × instead of opening the chat. */
+const LONG_PRESS_MS = 550;
+const REVEAL_FOR_MS = 4_000;
+
+/**
+ *  pill  -> first view in a visit: "Ready to onboard your hospital?"
+ *  open  -> the chat panel
+ *  icon  -> small round photo after any close; remembered for the visit
+ *  hidden-> after the icon's tiny ×; remembered for the visit, the footer link brings it back
+ */
+type Mode = "pill" | "open" | "icon" | "hidden";
+
+/** Bottom-right corner, above the phone's safe area. */
+const CORNER = "fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 sm:right-6 sm:bottom-6";
 
 const noSubscribe = () => () => {};
 
 /**
- * "Ready to onboard your hospital?" bubble for the public pages. Opens a chat
- * with Barbara (an AI twin). Renders nothing on the server, when disabled with
- * NEXT_PUBLIC_SALES_CHAT=off, or while the visitor has hidden it (7 days; the
- * footer's "Chat with Barbara" link brings it back).
+ * Chat bubble for the public pages. Opens a chat with Barbara (an AI twin).
+ * Renders nothing on the server or when disabled with NEXT_PUBLIC_SALES_CHAT=off.
  */
 export function SalesBubble() {
   const mounted = useSyncExternalStore(
@@ -31,36 +43,53 @@ export function SalesBubble() {
   return <SalesBubbleClient />;
 }
 
+function initialMode(): Mode {
+  const memory = loadBubbleMemory();
+  return memory === "hidden" ? "hidden" : memory === "icon" ? "icon" : "pill";
+}
+
 function SalesBubbleClient() {
-  const [hidden, setHiddenState] = useState(isHidden);
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [everOpened, setEverOpened] = useState(false);
   const [nudge, setNudge] = useState<string | null>(null);
+  const [revealHide, setRevealHide] = useState(false);
   const nudged = useRef(false);
-  const pillRef = useRef<HTMLButtonElement>(null);
-  const wasOpen = useRef(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const prevMode = useRef<Mode>(mode);
+  const pressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
 
   const openChat = useCallback(() => {
     setNudge(null);
     nudged.current = true;
     setEverOpened(true);
-    setOpen(true);
+    setMode("open");
+    // Once the visitor has engaged, later pages show the small icon rather than the big pill.
+    saveBubbleMemory("icon");
   }, []);
+
+  const collapse = useCallback(() => {
+    setNudge(null);
+    nudged.current = true;
+    setMode("icon");
+    saveBubbleMemory("icon");
+  }, []);
+
+  function hideForVisit() {
+    setRevealHide(false);
+    setMode("hidden");
+    saveBubbleMemory("hidden");
+  }
 
   // Footer link (or anything else) asks to show and open the chat.
   useEffect(() => {
-    const onOpen = () => {
-      setHidden(false);
-      setHiddenState(false);
-      openChat();
-    };
-    window.addEventListener(SALES_OPEN_EVENT, onOpen);
-    return () => window.removeEventListener(SALES_OPEN_EVENT, onOpen);
+    window.addEventListener(SALES_OPEN_EVENT, openChat);
+    return () => window.removeEventListener(SALES_OPEN_EVENT, openChat);
   }, [openChat]);
 
-  // Proactive nudge: 20 s after load, or once the visitor has scrolled through "How it works".
+  // Proactive nudge on the big pill only: 20 s after load, or once the visitor has scrolled through "How it works".
   useEffect(() => {
-    if (hidden || open || nudged.current) return;
+    if (mode !== "pill" || nudged.current) return;
     const show = () => {
       if (nudged.current) return;
       nudged.current = true;
@@ -76,7 +105,7 @@ function SalesBubbleClient() {
       window.clearTimeout(timer);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [hidden, open]);
+  }, [mode]);
 
   // The nudge stays for 8 s.
   useEffect(() => {
@@ -85,36 +114,54 @@ function SalesBubbleClient() {
     return () => window.clearTimeout(timer);
   }, [nudge]);
 
-  // Reserve room under the footer while the pill is showing.
+  // A long-press reveal of the × fades again after a few seconds.
+  useEffect(() => {
+    if (!revealHide) return;
+    const timer = window.setTimeout(() => setRevealHide(false), REVEAL_FOR_MS);
+    return () => window.clearTimeout(timer);
+  }, [revealHide]);
+
+  // Reserve room under the footer while the pill or the icon is showing.
   useEffect(() => {
     const root = document.documentElement;
-    if (!hidden && !open) root.style.setProperty("--sales-bubble-space", FOOTER_SPACE);
+    if (mode === "pill" || mode === "icon") root.style.setProperty("--sales-bubble-space", FOOTER_SPACE[mode]);
     else root.style.removeProperty("--sales-bubble-space");
     return () => {
       root.style.removeProperty("--sales-bubble-space");
     };
-  }, [hidden, open]);
+  }, [mode]);
 
-  // Back to the pill: return focus to it.
+  // After a close, keep keyboard focus on the launcher that replaced the chat or pill.
   useEffect(() => {
-    if (wasOpen.current && !open) pillRef.current?.focus({ preventScroll: true });
-    wasOpen.current = open;
-  }, [open]);
+    if (prevMode.current !== mode && (mode === "icon" || mode === "pill")) {
+      launcherRef.current?.focus({ preventScroll: true });
+    }
+    prevMode.current = mode;
+  }, [mode]);
 
-  function hide() {
-    setHidden(true);
-    setHiddenState(true);
-    setOpen(false);
-    setNudge(null);
+  function clearPress() {
+    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+    pressTimer.current = null;
   }
 
-  if (hidden) return null;
+  function onIconPointerDown(e: PointerEvent<HTMLButtonElement>) {
+    longPressed.current = false;
+    if (e.pointerType !== "touch") return;
+    clearPress();
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+      setRevealHide(true);
+    }, LONG_PRESS_MS);
+  }
+
+  if (mode === "hidden") return null;
 
   return (
     <>
-      {everOpened ? <SalesChat visible={open} onMinimise={() => setOpen(false)} onClose={hide} /> : null}
-      {open ? null : (
-        <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2.5 sm:right-6 sm:bottom-6">
+      {everOpened ? <SalesChat visible={mode === "open"} onClose={collapse} /> : null}
+
+      {mode === "pill" ? (
+        <div className={cn(CORNER, "flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2.5")}>
           {nudge ? (
             <button
               type="button"
@@ -133,16 +180,11 @@ function SalesBubbleClient() {
           ) : null}
           <div className="relative">
             <button
-              ref={pillRef}
+              ref={launcherRef}
               type="button"
               onClick={openChat}
               aria-haspopup="dialog"
-              className={cn(
-                "relative flex items-center gap-3 rounded-full bg-white py-2 pr-5 pl-2 text-left shadow-lift ring-1 ring-line transition-shadow hover:ring-brand-cyan/60",
-                // The arrival bounce plays once per page view, not again after minimising.
-                !everOpened && "cc-sales-arrive",
-                "cc-sales-pulse",
-              )}
+              className="cc-sales-arrive cc-sales-pulse relative flex items-center gap-3 rounded-full bg-white py-2 pr-5 pl-2 text-left shadow-lift ring-1 ring-line transition-shadow hover:ring-brand-cyan/60"
             >
               <BarbaraPhoto size={40} />
               <span className="flex min-w-0 flex-col leading-tight">
@@ -157,16 +199,65 @@ function SalesBubbleClient() {
             </button>
             <button
               type="button"
-              onClick={hide}
-              aria-label="Hide the chat bubble for 7 days"
-              title="Hide for 7 days"
+              onClick={collapse}
+              aria-label="Shrink the chat bubble"
+              title="Shrink"
               className="absolute -top-2 -left-2 grid size-6 place-items-center rounded-full bg-white text-ink-soft shadow-soft ring-1 ring-line transition-colors before:absolute before:-inset-2.5 before:content-[''] hover:text-ink"
             >
               <X className="size-3.5" aria-hidden="true" />
             </button>
           </div>
         </div>
-      )}
+      ) : null}
+
+      {mode === "icon" ? (
+        <div className={cn(CORNER, "group")} data-reveal={revealHide || undefined}>
+          <button
+            ref={launcherRef}
+            type="button"
+            aria-label="Chat with Barbara"
+            aria-haspopup="dialog"
+            title="Chat with Barbara"
+            onClick={() => {
+              // A long-press on a phone shows the × instead of opening the chat.
+              if (longPressed.current) {
+                longPressed.current = false;
+                return;
+              }
+              openChat();
+            }}
+            onPointerDown={onIconPointerDown}
+            onPointerUp={clearPress}
+            onPointerLeave={clearPress}
+            onPointerCancel={clearPress}
+            onContextMenu={(e) => e.preventDefault()}
+            className="cc-sales-icon-in relative block size-12 rounded-full bg-white p-0.5 shadow-lift ring-2 ring-brand-cyan transition-transform duration-200 ease-out select-none [-webkit-touch-callout:none] hover:scale-[1.06] active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100"
+          >
+            <BarbaraPhoto size={44} ring={false} />
+            <span
+              aria-hidden="true"
+              className="absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full bg-brand-cyan text-white ring-2 ring-white"
+            >
+              <MessageCircle className="size-3" strokeWidth={2.75} />
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={hideForVisit}
+            aria-label="Hide the chat for this visit"
+            title="Hide for this visit"
+            className={cn(
+              "absolute -top-1.5 -left-1.5 grid size-5 place-items-center rounded-full bg-white text-ink-soft shadow-soft ring-1 ring-line transition-opacity duration-150 before:absolute before:-inset-2 before:content-[''] hover:text-ink motion-reduce:transition-none",
+              "pointer-events-none opacity-0",
+              "group-hover:pointer-events-auto group-hover:opacity-100",
+              "group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100",
+              "group-data-[reveal]:pointer-events-auto group-data-[reveal]:opacity-100",
+            )}
+          >
+            <X className="size-3" aria-hidden="true" strokeWidth={2.75} />
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -4,11 +4,21 @@ import { cn } from "@/lib/cn";
 import { BARBARA_PHOTO } from "./salesStorage";
 
 /** Barbara's photo in a circle with a light brand ring. */
-export function BarbaraPhoto({ size = 40, className }: { size?: number; className?: string }) {
+export function BarbaraPhoto({
+  size = 40,
+  ring = true,
+  className,
+}: {
+  size?: number;
+  /** The light ring; off when the parent draws its own. */
+  ring?: boolean;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
-        "relative block shrink-0 overflow-hidden rounded-full bg-[radial-gradient(circle_at_50%_35%,#ffffff_0%,var(--surface-pale)_60%,#cfe9f2_100%)] ring-2 ring-[#bfe3ee]",
+        "relative block shrink-0 overflow-hidden rounded-full bg-[radial-gradient(circle_at_50%_35%,#ffffff_0%,var(--surface-pale)_60%,#cfe9f2_100%)]",
+        ring && "ring-2 ring-[#bfe3ee]",
         className,
       )}
       style={{ width: size, height: size }}
@@ -19,7 +29,8 @@ export function BarbaraPhoto({ size = 40, className }: { size?: number; classNam
         width={size * 2}
         height={size * 2}
         loading="eager"
-        className="size-full object-cover object-[50%_20%]"
+        draggable={false}
+        className="size-full object-cover object-[50%_20%] select-none [-webkit-touch-callout:none]"
       />
     </span>
   );

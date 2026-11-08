@@ -120,6 +120,20 @@ def test_not_in_plan_offers_and_sends_nothing():
     assert len(_escalations(TestSession, ctx)) == before
 
 
+def test_consent_yes_without_a_care_team_queues_nothing():
+    client, TestSession, ctx = _setup({"Can I eat sushi?": _not_in_plan()})
+    with TestSession() as db:  # a self-signed-up patient: no clinician assigned
+        db.get(Patient, ctx["patient_id"]).clinician_id = None
+        db.commit()
+    before = len(_escalations(TestSession, ctx))
+    _say(client, ctx, "Can I eat sushi?")
+    r = _say(client, ctx, "yes")
+    assert r["action_result"]["status"] == "failed" and r["escalated"] is False
+    assert r["message"]["content"] == phrase.NO_CARE_TEAM
+    assert "queue" not in r["message"]["content"] and r["pending_action"] is None
+    assert len(_escalations(TestSession, ctx)) == before
+
+
 def test_consent_yes_sends_one_message():
     client, TestSession, ctx = _setup({"Can I eat sushi?": _not_in_plan()})
     _say(client, ctx, "Can I eat sushi?")
@@ -830,6 +844,142 @@ def test_history_has_routes_and_voice_shares_state():
     assistant = [m for m in history if m["role"] == "assistant"]
     assert [m["route"] for m in assistant[-2:]] == ["NOT_IN_PLAN", "OPERATIONAL"]
     assert [m["role"] for m in history[-4:]] == ["patient", "assistant", "patient", "assistant"]
+
+
+# ---- voice: off-track turns steer back to the check-in ----------------------------------------
+
+STEER_LEADS = tuple(s.split("{")[0].strip() for s in phrase.STEER_LEADS)
+
+
+def _steer_lead(text):
+    return next((lead for lead in STEER_LEADS if lead in text), None)
+
+
+def _assert_steer(r, question):
+    """Two sentences at most, the last one a steer that asks `question` again."""
+    _assert_short(r)
+    last = phrase.split_sentences(r["message"]["content"])[-1]
+    assert _steer_lead(last) and last.endswith(question), r["message"]["content"]
+
+
+def test_voice_off_topic_during_checkin_steers_back():
+    client, TestSession, ctx = _setup(now="05:00")  # no dose due: pain, numbness, falls
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    r = _say(client, ctx, "What's the weather like?", source="voice")
+    assert r["route"] == "NOT_IN_PLAN"
+    first, _ = phrase.split_sentences(r["message"]["content"])
+    assert first in phrase.OFF_TOPIC_VOICE  # one friendly line, no "doesn't cover that"
+    _assert_steer(r, "what's your pain from zero to ten?")
+    assert r["offer_contact"] is False and r["pending_action"] is None and r["escalated"] is False
+    assert r["checkin"]["step"] == 1
+
+    again = _say(client, ctx, "Who won the game?", source="voice")
+    _assert_steer(again, "what's your pain from zero to ten?")
+    assert _steer_lead(again["message"]["content"]) != _steer_lead(r["message"]["content"])  # never the same twice
+    assert phrase.split_sentences(again["message"]["content"])[0] != first
+
+    r = _say(client, ctx, "3", source="voice")
+    assert r["checkin"]["step"] == 3 and r["checkin"]["answers"]["pain"] == 3
+    assert _escalations(TestSession, ctx, "patient_request") == []
+
+
+def test_chat_off_topic_during_checkin_is_unchanged():
+    client, _, ctx = _setup(now="05:00")
+    _say(client, ctx, "Can we do my recovery check-in?")
+    r = _say(client, ctx, "What's the weather like?")
+    assert r["route"] == "NOT_IN_PLAN" and r["offer_contact"] is True
+    assert r["message"]["content"] == ("I can only help with your recovery care plan. "
+                                       "Would you like me to send a message to your care team?")
+    assert _steer_lead(r["message"]["content"]) is None
+
+
+def test_voice_steer_never_repeats_back_to_back():
+    client, _, ctx = _setup(now="05:00")
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    leads = []
+    for msg in ("What's the weather like?", "Who won the game?", "Tell me a joke.", "What's the score?",
+                "What's the news today?"):
+        r = _say(client, ctx, msg, source="voice")
+        _assert_steer(r, "what's your pain from zero to ten?")
+        leads.append(_steer_lead(r["message"]["content"]))
+    assert all(a != b for a, b in zip(leads, leads[1:])), leads
+
+
+def test_voice_off_topic_without_question_mark_is_not_a_bad_answer():
+    client, _, ctx = _setup(now="07:00")  # the 6 AM acetaminophen is due
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    assert _say(client, ctx, "4", source="voice")["message"]["content"] == ACET_6
+    r = _say(client, ctx, "who won the game", source="voice")
+    _assert_steer(r, "did you take your acetaminophen at six this morning?")
+    assert r["checkin"]["step"] == 2 and r["checkin"]["substep"]["name"] == "Acetaminophen"
+
+    client, _, ctx = _setup(now="07:00")  # chat keeps asking the dose question again
+    _say(client, ctx, "Can we do my recovery check-in?")
+    _say(client, ctx, "4")
+    r = _say(client, ctx, "who won the game")
+    assert r["route"] == "START_CHECKIN" and _steer_lead(r["message"]["content"]) is None
+
+
+def test_voice_not_in_plan_keeps_the_offer_and_resumes_after_it():
+    client, TestSession, ctx = _setup(now="05:00")
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    r = _say(client, ctx, "Can I take ibuprofen?", source="voice")
+    assert r["route"] == "NOT_IN_PLAN" and r["offer_contact"] is True
+    assert r["message"]["content"].endswith(phrase.OFFER)  # the offer needs the second sentence: no steer yet
+    assert _steer_lead(r["message"]["content"]) is None
+    _assert_short(r)
+    r = _say(client, ctx, "yes", source="voice")
+    assert r["action_result"]["status"] == "sent"
+    assert r["message"]["content"] == f"{phrase.SENT} What is your pain level from zero to ten?"
+    assert len(_escalations(TestSession, ctx, "patient_request")) == 1
+
+
+def test_voice_identity_and_capability_during_checkin():
+    client, _, ctx = _setup(now="05:00")
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    r = _say(client, ctx, "Are you a robot?", source="voice")
+    assert r["route"] == "OPERATIONAL"
+    assert r["message"]["content"].startswith("I'm an AI recovery helper, not a doctor or nurse.")
+    _assert_steer(r, "what's your pain from zero to ten?")
+
+    r = _say(client, ctx, "Can you call my surgeon for me?", source="voice")
+    assert r["offer_contact"] is True and r["message"]["content"] == phrase.CAPABILITY  # offer first, steer later
+
+    client, _, ctx = _setup(now="05:00")  # chat: the full identity answer, no steer
+    _say(client, ctx, "Can we do my recovery check-in?")
+    r = _say(client, ctx, "Are you a robot?")
+    assert r["message"]["content"] == phrase.IDENTITY
+
+
+def test_voice_off_topic_without_checkin_invites_a_recovery_question():
+    client, _, ctx = _setup()
+    r = _say(client, ctx, "Who won the game last night?", source="voice")
+    assert r["route"] == "NOT_IN_PLAN" and r["offer_contact"] is False and r["checkin"] is None
+    first, second = phrase.split_sentences(r["message"]["content"])
+    assert first in phrase.OFF_TOPIC_VOICE and second in phrase.WRAP_UP_VOICE
+    r = _say(client, ctx, "Who won the game last night?")  # chat: scope line and the offer, as before
+    assert r["offer_contact"] is True and r["message"]["content"].endswith(phrase.OFFER)
+
+
+def test_voice_checkin_request_mid_checkin_picks_up_where_it_stopped():
+    client, _, ctx = _setup(now="05:00")
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    _say(client, ctx, "2", source="voice")
+    r = _say(client, ctx, "Let's do my check-in.", source="voice")
+    assert r["route"] == "START_CHECKIN" and r["checkin"]["step"] == 3
+    assert r["message"]["content"] == f"Let's keep going with your check-in. {NUMBNESS}"
+
+
+def test_voice_checkin_close_invites_anything_else():
+    client, _, ctx = _setup(now="05:00")
+    _say(client, ctx, "Can we do my recovery check-in?", source="voice")
+    _say(client, ctx, "2", source="voice")
+    _say(client, ctx, "no", source="voice")
+    r = _say(client, ctx, "no", source="voice")
+    assert r["checkin"]["step"] == "done" and r["route"] == "OPERATIONAL"
+    assert r["message"]["content"] == ("Thanks for checking in, Jordan, I saved your answers. "
+                                       "Anything else about your recovery before we wrap up?")
+    _assert_short(r)
 
 
 if __name__ == "__main__":

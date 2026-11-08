@@ -22,6 +22,8 @@ IDENTITY = "I'm an AI recovery helper, not a doctor or nurse. I can help explain
 SENT = "I've sent your message to your care team's queue."
 SEND_FAILED = "I couldn't send the message. Please call your medical team."
 NOT_SENT = "Okay, I won't send anything."
+NO_CARE_TEAM = ("You don't have a care team connected in CloudCare yet, "
+                "so please call your surgeon's office about this.")
 
 MAX_SENTENCES = 2
 
@@ -268,6 +270,83 @@ def operational(kind: str, name: str, recent: list[str] | tuple[str, ...] = (), 
 
 CAPABILITY = ("I can't place phone calls, but I can send a message to your care team's queue. "
               "Would you like me to do that?")
+
+
+# ---- voice: keeping a call on its mission ------------------------------------------------------
+# On a call, a turn that wanders off during a check-in ends by asking the waiting question again,
+# briefly, with wording that changes from turn to turn. "{q}" is the brief question.
+STEER_LEADS = (
+    "Now, back to your check-in: {q}",
+    "Let's get back to your check-in: {q}",
+    "Okay, back to your check-in: {q}",
+    "Back to your check-in for a moment: {q}",
+)
+# A question that has nothing to do with recovery (weather, sports): one honest, friendly sentence.
+OFF_TOPIC_VOICE = (
+    "I'm not sure about that one, since I only know about your recovery.",
+    "Good question, but I only know about your recovery.",
+    "I wish I could help with that, but I stick to your recovery.",
+    "That's outside what I know, since I only cover your recovery.",
+)
+# No check-in waiting: invite a recovery question instead.
+WRAP_UP_VOICE = (
+    "Anything else about your recovery I can help with?",
+    "Is there anything about your recovery you'd like to go over?",
+    "Anything else about your recovery before we wrap up?",
+)
+BRIEF_CHECKIN = {
+    "pain": "what's your pain from zero to ten?",
+    "meds_taken": "have you taken your medicines as your plan says?",
+    "numbness": "any new numbness, tingling, or color change?",
+    "fall": "any falls {since}?",
+}
+VOICE_CHECKIN_DONE = "Thanks for checking in, {name}, I saved your answers."
+VOICE_CHECKIN_QUEUED = "Thanks for checking in, {name}, your answers are in your care team's queue for review."
+VOICE_WRAP_UP = "Anything else about your recovery before we wrap up?"
+
+
+def _lead_of(template: str) -> str:
+    return template.split("{")[0].strip()
+
+
+def _fresh(options: list[str], recent: list[str] | tuple[str, ...], key=lambda o: o) -> list[str]:
+    """Options whose wording was not used in the last two assistant turns (never empty)."""
+    for window in (list(recent or ())[-2:], list(recent or ())[-1:]):
+        fresh = [o for o in options if not any(key(o) in r for r in window)]
+        if fresh:
+            return fresh
+    return options
+
+
+def brief_checkin_question(step: str, first_checkin: bool) -> str:
+    since = "since your surgery" if first_checkin else "since your last check-in"
+    return BRIEF_CHECKIN[step].format(since=since)
+
+
+def brief_dose_question(dose: dict) -> str:
+    from app.services.foggy import doses
+
+    return f"did you take your {dose['name'].lower()} at {doses.spoken_time(dose['hour'], dose['minute'])}?"
+
+
+def brief_as_needed_question(name: str) -> str:
+    return f"did you need any {name.lower()} today?"
+
+
+def steer_back(question: str, recent: list[str] | tuple[str, ...] = ()) -> str:
+    """One sentence that returns to the check-in, never with the lead used just before."""
+    q = (question or "").strip()
+    q = q[0].lower() + q[1:] if q else q
+    picks = _fresh(list(STEER_LEADS), recent, key=_lead_of)
+    return random.choice(picks).format(q=q)
+
+
+def off_topic_voice(recent: list[str] | tuple[str, ...] = ()) -> str:
+    return random.choice(_fresh(list(OFF_TOPIC_VOICE), recent))
+
+
+def wrap_up_voice(recent: list[str] | tuple[str, ...] = ()) -> str:
+    return random.choice(_fresh(list(WRAP_UP_VOICE), recent))
 
 
 # ---- plan answers ---------------------------------------------------------------------------

@@ -75,6 +75,7 @@ class _Ctx:
     action_result: dict | None = None
     checkin_done: dict | None = None
     model_degraded: bool = False  # a model call was needed but failed (rules answered instead)
+    off_track: tuple[str, str | None] | None = None  # (kind, detail) of a turn that left the call's mission
 
 
 # ---- entry point ----------------------------------------------------------------------
@@ -112,6 +113,7 @@ def answer_turn(db: Session, patient: Patient, message: str, source: str = "chat
     if _needs_classifier(ctx):
         ctx.cls = classify_mod.classify_message(message, chunks, history, st)
     _decide(ctx)
+    _steer_back(ctx)
 
     caps = actions_mod.capabilities()
     if ctx.new_pending and not caps["message_care_team"]:
@@ -198,16 +200,19 @@ def _decide(ctx: _Ctx) -> None:
 
     if lexicon.asks_identity(t) or (cls and (cls.asks_identity or cls.operational_kind == "identity")):
         ctx.route, ctx.text = "OPERATIONAL", phrase.IDENTITY
+        ctx.off_track = ("identity", None)
         return
 
     if lexicon.asks_capability(t) or (cls and (cls.topic_kind == "capability" or cls.operational_kind == "capability")):
         ctx.route, ctx.text = "OPERATIONAL", phrase.CAPABILITY
+        ctx.off_track = ("capability", None)
         _offer(ctx, "Patient asked to contact the care team")
         return
 
     talk = _social(ctx)
     if talk:
         ctx.route = "OPERATIONAL"
+        ctx.off_track = ("social", talk)
         if ctx.checkin and ctx.checkin.get("awaiting"):
             ctx.text = "Let's finish your check-in. " + _checkin_prompt(ctx)
         else:
@@ -228,9 +233,67 @@ def _decide(ctx: _Ctx) -> None:
         return
     if cls and cls.route == "OPERATIONAL" and cls.topic_kind not in ("plan_question", "other_medical", "other"):
         ctx.route, ctx.text = "OPERATIONAL", phrase.operational("other", ctx.name)
+        ctx.off_track = ("other", None)
         return
 
     _answer_from_plan(ctx, kind, matched)
+
+
+# ---- voice: steer back to the check-in ---------------------------------------------------------
+
+STEER_SOCIAL = ("thanks", "wellbeing", "acknowledgment")  # social replies worth keeping before the steer
+
+
+def _off_track_question(message: str) -> bool:
+    """A question that is plainly not an answer (identity, capability, trivia), even without a "?"."""
+    return (lexicon.asks_identity(message) or lexicon.asks_capability(message)
+            or lexicon.out_of_scope_kind(message)[0] == "non_medical")
+
+
+def _checkin_waiting(ctx: _Ctx) -> bool:
+    return bool(ctx.checkin and (ctx.checkin.get("awaiting") or ctx.checkin.get("clarifying")))
+
+
+def _brief_checkin_question(ctx: _Ctx) -> str:
+    checkin = ctx.checkin or {}
+    if checkin.get("clarifying"):
+        return phrase.CHECKIN_CLARIFY[checkin["clarifying"]]
+    if checkin.get("awaiting") == "meds_taken" and _dose_loop(checkin):
+        meds = _meds(checkin)
+        if meds["queue"]:
+            return phrase.brief_dose_question(meds["queue"][0])
+        return phrase.brief_as_needed_question(meds["prn"][0]["name"])
+    return phrase.brief_checkin_question(checkin["awaiting"], checkin.get("first", False))
+
+
+def _steer_back(ctx: _Ctx) -> None:
+    """Voice calls only: a turn that wandered off (trivia, identity, small talk) while a check-in
+    question is waiting ends by asking that question again, briefly, within the two-sentence limit.
+    A reply whose second sentence is a contact offer keeps the offer; the check-in resumes once the
+    offer is answered. Trivia never gets a contact offer on a call, only a friendly line and a steer."""
+    if ctx.source != "voice" or not ctx.off_track or ctx.route not in ("NOT_IN_PLAN", "OPERATIONAL"):
+        return
+    kind, detail = ctx.off_track
+    recent = [h["content"] for h in ctx.history if h["role"] == "assistant"]
+    waiting = _checkin_waiting(ctx)
+
+    if kind == "not_in_plan" and detail == "non_medical":
+        ctx.new_pending = None  # nothing about the weather or a game is worth a message to the team
+        follow = phrase.steer_back(_brief_checkin_question(ctx), recent) if waiting else phrase.wrap_up_voice(recent)
+        ctx.text = f"{phrase.off_topic_voice(recent)} {follow}"
+        return
+    if not waiting or ctx.new_pending:
+        return
+    if kind == "identity":
+        lead = phrase.split_sentences(phrase.IDENTITY)[0]
+    elif kind == "social":
+        lead = phrase.social(detail, ctx.name, recent, ctx.message) if detail in STEER_SOCIAL else ""
+    elif kind == "other":
+        lead = phrase.split_sentences(ctx.text)[0]
+    else:
+        return
+    lead = phrase.split_sentences(lead)[0] if lead else ""
+    ctx.text = f"{lead} {phrase.steer_back(_brief_checkin_question(ctx), recent)}".strip()
 
 
 def _social_only(ctx: _Ctx) -> str | None:
@@ -323,6 +386,7 @@ def _not_in_plan(ctx: _Ctx, kind: str | None, matched: str) -> None:
     ctx.route = "NOT_IN_PLAN"
     ctx.text, reason = phrase.not_in_plan(kind, topic, ctx.name, relation)
     ctx.answered_from_plan = False
+    ctx.off_track = ("not_in_plan", kind)
     _offer(ctx, reason)
 
 
@@ -371,6 +435,8 @@ def _handle_consent(ctx: _Ctx) -> bool:
                 ctx.text = phrase.SENT + " Please still call your surgeon or medical team."
             else:
                 ctx.text = phrase.SENT + resume
+        elif result.get("detail") == actions_mod.NO_CARE_TEAM_DETAIL:
+            ctx.text = phrase.NO_CARE_TEAM + resume  # nothing queued: nobody is assigned to read it
         else:
             ctx.text = phrase.SEND_FAILED
         return True
@@ -610,6 +676,8 @@ def _handle_dose_answer(ctx: _Ctx, checkin: dict, triggers: list[str]) -> bool:
         if answer is None:
             if not _looks_like_answer(text) or triggers or lexicon.dose_change_requested(text):
                 return False
+            if ctx.source == "voice" and _off_track_question(text):
+                return False  # "who won the game": answered briefly, then the dose is asked again
             answer = "unclear"  # a short reply that answers nothing
         if answer == "unclear" and triggers:
             pass  # the call-the-team reply comes first; this dose is asked again afterwards
@@ -696,6 +764,8 @@ def _compose(*parts: str) -> str:
 
 def _handle_checkin_answer(ctx: _Ctx, triggers: list[str]) -> bool:
     checkin = ctx.checkin
+    if ctx.source == "voice" and lexicon.checkin_requested(ctx.message) and _bare_answer(ctx) is None:
+        return False  # "let's do my check-in" on a call: pick up where it stopped, not "yes or no?"
     if lexicon.CHECKIN_CANCEL.match(lexicon.normalize(ctx.message)):
         ctx.checkin = None
         ctx.route, ctx.text = "OPERATIONAL", "Okay, we can finish your check-in later."
@@ -718,7 +788,9 @@ def _handle_checkin_answer(ctx: _Ctx, triggers: list[str]) -> bool:
     if awaiting not in updates and not (set(updates) & set(CHECKIN_STEPS)) and not absorbed:
         if awaiting == "pain" and "uncontrolled_pain" in triggers:
             return False  # "it's out of control": CALL_SURGEON handles it, check-in kept
-        if _looks_like_answer(ctx.message) and not triggers and not lexicon.dose_change_requested(ctx.message):
+        voice_aside = ctx.source == "voice" and _off_track_question(ctx.message)
+        if _looks_like_answer(ctx.message) and not triggers and not lexicon.dose_change_requested(ctx.message) \
+                and not voice_aside:
             ctx.route, ctx.text = "START_CHECKIN", phrase.CHECKIN_REASK[awaiting]
             return True
         return False
@@ -758,7 +830,10 @@ def _advance(ctx: _Ctx, answers: dict, intro: str, triggers: list[str]) -> None:
             _call_surgeon(ctx, triggers)
             return
         ctx.route = "OPERATIONAL"
-        if result["escalated"]:
+        if ctx.source == "voice":  # a call moves on to its close: one invitation for anything else
+            done = phrase.VOICE_CHECKIN_QUEUED if result["escalated"] else phrase.VOICE_CHECKIN_DONE
+            ctx.text = f"{done.format(name=ctx.name)} {phrase.VOICE_WRAP_UP}"
+        elif result["escalated"]:
             ctx.text = f"Thanks for checking in, {ctx.name}. Your answers are in your care team's queue for review."
         else:
             ctx.text = f"Thanks for checking in, {ctx.name}. I saved your answers."

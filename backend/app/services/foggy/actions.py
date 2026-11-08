@@ -30,6 +30,8 @@ CAPABILITIES = {
 }
 
 DUPLICATE_WINDOW = timedelta(minutes=5)
+# A self-signed-up patient with no clinician assigned: nobody would read a queued message.
+NO_CARE_TEAM_DETAIL = "No care team is connected yet."
 SUMMARY_MAX = 500
 
 
@@ -64,6 +66,8 @@ class TurnActions:
             return {"kind": "message_care_team", "status": "failed", "detail": "Messaging is not available."}
         if consent != "yes" or pending.get("kind") != "message_care_team" or pending.get("recipient") != "care_team":
             return {"kind": "message_care_team", "status": "failed", "detail": "No agreement to this action."}
+        if getattr(self.patient, "clinician_id", None) is None:
+            return {"kind": "message_care_team", "status": "failed", "detail": NO_CARE_TEAM_DETAIL}
         words = (pending.get("patient_words") or "").strip()[:SUMMARY_MAX] or "Patient asked to contact the care team."
         severity = "high" if pending.get("origin_route") == "CALL_SURGEON" else "low"
         try:

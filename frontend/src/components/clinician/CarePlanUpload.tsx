@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckCircle2, FileText, LoaderCircle, Upload } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FileText, LoaderCircle, Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import { errorMessage } from "@/lib/api/client";
 import { uploadCarePlan } from "@/lib/api/patients";
 import type { CarePlanOut } from "@/lib/api/types";
+import { cn } from "@/lib/cn";
 import { DEMO_CARE_PLAN_TEXT, DEMO_CARE_PLAN_TITLE, splitIntoChunks } from "@/lib/demo/demoCarePlan";
 
 export function CarePlanUpload({
@@ -29,6 +30,7 @@ export function CarePlanUpload({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<CarePlanOut | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const ids = useId();
   const preview = raw.trim() ? splitIntoChunks(raw) : [];
   const dirty = !saved && raw.trim() !== "";
@@ -135,6 +137,45 @@ export function CarePlanUpload({
           required
         />
       </Field>
+      {preview.length > 0 ? (
+        <div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowPreview((s) => !s)}
+            aria-expanded={showPreview}
+            aria-controls={`${ids}-preview`}
+          >
+            {showPreview ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+            {showPreview ? "Hide preview" : `Preview sections (${preview.length})`}
+          </Button>
+          {showPreview ? (
+            <div id={`${ids}-preview`} className="mt-3">
+              <p className="text-xs text-brand-gray">
+                How Foggy will see this plan once it&rsquo;s saved. Untitled parts still work, but Foggy can&rsquo;t
+                name them when citing.
+              </p>
+              <ol className="mt-2 flex flex-col gap-2">
+                {preview.map((p, i) => (
+                  <li key={i} className="rounded-2xl bg-surface-soft px-4 py-3 ring-1 ring-line/60">
+                    <p
+                      className={cn(
+                        "text-sm font-extrabold break-words",
+                        p.section ? "text-brand-cyan-strong" : "text-[#7d5600]",
+                      )}
+                    >
+                      {p.section ?? `Part ${i + 1} · no section name`}
+                    </p>
+                    <p className="mt-1 line-clamp-3 text-sm break-words whitespace-pre-line text-ink-soft">
+                      {p.content}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="rounded-2xl bg-brand-red/8 px-4 py-3 text-sm font-semibold text-brand-red-dark">
           {error}

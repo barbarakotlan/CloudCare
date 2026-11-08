@@ -45,7 +45,8 @@ import {
 import { useAsync } from "@/lib/hooks/useAsync";
 import { formatPhone } from "@/lib/phone";
 import { CarePlanUpload } from "./CarePlanUpload";
-import { TriggerLabel } from "./EscalationQueue";
+import { RiskInfo } from "./RiskInfo";
+import { reviewText, TriggerLabel } from "./EscalationQueue";
 import { PatientProfileForm } from "./PatientProfileForm";
 import { RISK_TONE, SEVERITY_TONE, STATUS_LABEL } from "./severity";
 import { CurrentStatusChip, RiskModelSummary, riskTimeOf, urgencyOf } from "./urgency";
@@ -90,7 +91,7 @@ export function PatientDrawer({
             <CurrentStatusChip urgency={urgencyOf(row, escalations)} />
             <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <span className="text-[0.7rem] font-extrabold tracking-wide text-brand-gray uppercase">Risk model</span>
-              <RiskModelSummary row={row} now={now} />
+              <RiskModelSummary row={row} now={now} info={row.latest_risk ? <RiskInfo /> : null} />
             </span>
           </div>
         ) : null
@@ -290,6 +291,7 @@ function DrawerBody({
             <h3 id="ov-risk" className="flex items-center gap-2 font-extrabold text-ink">
               <Activity className="size-4 text-brand-cyan-strong" aria-hidden="true" />
               Risk model
+              <RiskInfo />
             </h3>
             {row?.latest_risk ? (
               <div className="mt-3">
@@ -341,6 +343,7 @@ function DrawerBody({
                     <span className="ml-auto text-xs text-brand-gray">{STATUS_LABEL[e.status]}</span>
                   </div>
                   <p className="mt-1 break-words text-ink-soft">{humanizeFactors(e.summary)}</p>
+                  {reviewText(e) ? <p className="mt-1 text-xs font-semibold text-brand-gray">{reviewText(e)}</p> : null}
                 </li>
               ))}
             </ul>

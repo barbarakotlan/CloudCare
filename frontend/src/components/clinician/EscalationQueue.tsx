@@ -8,12 +8,28 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { Textarea } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Skeleton } from "@/components/ui/Skeleton";
-import type { EscalationOut, EscalationStatus, EscalationTrigger } from "@/lib/api/types";
+import type { EscalationOut, EscalationStatus, EscalationTrigger, Severity } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import { formatDateTime, humanizeFactors, relativeTime, SEVERITY_LABEL, TRIGGER_LABEL } from "@/lib/format";
+import {
+  formatDateTime,
+  formatMessageTime,
+  humanizeFactors,
+  relativeTime,
+  SEVERITY_LABEL,
+  TRIGGER_LABEL,
+} from "@/lib/format";
 import { SEVERITY_BAR, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE, TRIGGER_TONE } from "./severity";
 
 export type QueueFilter = "active" | "resolved" | "all";
+export type SeverityFilter = Severity | "all";
+
+const SEVERITY_OPTIONS: Array<{ value: SeverityFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "emergency", label: "Emergency" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
 
 export function EscalationQueue({
   items,
@@ -21,6 +37,9 @@ export function EscalationQueue({
   error,
   filter,
   onFilter,
+  severity,
+  onSeverity,
+  narrowed = false,
   onUpdate,
   onOpenPatient,
   highlightIds,
@@ -32,6 +51,10 @@ export function EscalationQueue({
   error: string | null;
   filter: QueueFilter;
   onFilter: (f: QueueFilter) => void;
+  severity: SeverityFilter;
+  onSeverity: (s: SeverityFilter) => void;
+  /** A search or severity filter is hiding some items. */
+  narrowed?: boolean;
   onUpdate: (id: string, status: EscalationStatus, notes?: string) => Promise<void>;
   onOpenPatient: (patientId: string) => void;
   highlightIds: Set<string>;
@@ -71,6 +94,18 @@ export function EscalationQueue({
             />
           }
         />
+        {/* Five options don't fit a phone: the row scrolls sideways inside the card. */}
+        <div className="-mx-5 mb-2 overflow-x-auto px-5 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
+          <SegmentedControl<SeverityFilter>
+            label="Severity"
+            size="sm"
+            value={severity}
+            onChange={onSeverity}
+            fullWidth={false}
+            className="min-w-max"
+            options={SEVERITY_OPTIONS}
+          />
+        </div>
       </div>
 
       {error ? (
@@ -92,10 +127,16 @@ export function EscalationQueue({
             <Inbox className="size-7" aria-hidden="true" />
           </span>
           <p className="mt-4 font-extrabold text-ink">
-            {filter === "active" ? "Nothing needs you right now" : "No escalations here yet"}
+            {narrowed
+              ? "No escalations match these filters"
+              : filter === "active"
+                ? "Nothing needs you right now"
+                : "No escalations here yet"}
           </p>
           <p className="mt-1 max-w-sm text-sm text-brand-gray">
-            Red-flag messages, high-risk check-ins and patients asking to contact you will appear here within seconds.
+            {narrowed
+              ? "Clear the search or pick another severity to see the rest."
+              : "Red-flag messages, high-risk check-ins and patients asking to contact you will appear here within seconds."}
           </p>
         </div>
       ) : null}
@@ -130,6 +171,34 @@ export function TriggerLabel({ trigger }: { trigger: EscalationTrigger }) {
     );
   }
   return <span className="text-sm font-bold text-ink-soft">{label}</span>;
+}
+
+/**
+ * "Acknowledged by Dr. X · 3:12 PM" / "Resolved by Dr. X · Nov 7, 3:12 PM".
+ * Older servers send no reviewer or acknowledge time; show what is known.
+ */
+export function reviewText(item: EscalationOut): string | null {
+  const by = item.reviewed_by_name ? ` by ${item.reviewed_by_name}` : "";
+  if (item.status === "resolved") {
+    if (!item.resolved_at && !by) return null;
+    return `Resolved${by}${item.resolved_at ? ` · ${formatMessageTime(item.resolved_at)}` : ""}`;
+  }
+  if (item.status === "acknowledged") {
+    if (!item.acknowledged_at && !by) return null;
+    return `Acknowledged${by}${item.acknowledged_at ? ` · ${formatMessageTime(item.acknowledged_at)}` : ""}`;
+  }
+  return null;
+}
+
+function ReviewLine({ item }: { item: EscalationOut }) {
+  const text = reviewText(item);
+  if (!text) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-brand-gray">
+      <CheckCheck className="size-3.5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 break-words">{text}</span>
+    </p>
+  );
 }
 
 function EscalationItem({
@@ -195,6 +264,7 @@ function EscalationItem({
         </span>
       </div>
       <p className="mt-1 leading-relaxed break-words text-ink-soft">{humanizeFactors(item.summary)}</p>
+      <ReviewLine item={item} />
       {item.clinician_notes ? (
         <p className="mt-2 rounded-2xl bg-surface-soft px-3 py-2 text-sm break-words text-ink-soft">
           <span className="font-bold text-ink">Note: </span>

@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertOctagon, BellRing, HeartPulse, UsersRound } from "lucide-react";
+import { AlertOctagon, BellRing, HeartPulse, Search, UsersRound } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
 import { DemoResetControl, describeReset } from "@/components/app/DemoResetControl";
+import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ToastViewport, useToasts } from "@/components/ui/Toast";
 import { errorMessage } from "@/lib/api/client";
@@ -17,7 +18,8 @@ import { cn } from "@/lib/cn";
 import { greetingFor, SEVERITY_LABEL, TRIGGER_LABEL } from "@/lib/format";
 import { useNow } from "@/lib/hooks/useNow";
 import { usePolling } from "@/lib/hooks/usePolling";
-import { EscalationQueue, type QueueFilter } from "./EscalationQueue";
+import { EscalationQueue, type QueueFilter, type SeverityFilter } from "./EscalationQueue";
+import { RiskInfo } from "./RiskInfo";
 import { PatientDrawer } from "./PatientDrawer";
 import { PatientTable } from "./PatientTable";
 
@@ -40,6 +42,8 @@ export function ClinicianDashboard({ session }: { session: Session }) {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [highlight, setHighlight] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [severity, setSeverity] = useState<SeverityFilter>("all");
   const seenIds = useRef<Set<string> | null>(null);
   const filterRef = useRef(filter);
   const { toasts, push, dismiss } = useToasts(8000);
@@ -167,6 +171,17 @@ export function ClinicianDashboard({ session }: { session: Session }) {
   const modelHigh = patients?.filter((p) => p.latest_risk?.risk_level === "high").length;
   const selectedRow = patients?.find((p) => p.id === selectedId);
 
+  // Client-side search (name or procedure) and severity filter.
+  const q = query.trim().toLowerCase();
+  const procedureOf = new Map((patients ?? []).map((p) => [p.id, p.procedure_name]));
+  const matchesQuery = (name: string, procedure: string | undefined) =>
+    q === "" || name.toLowerCase().includes(q) || Boolean(procedure?.toLowerCase().includes(q));
+  const shownPatients = patients?.filter((p) => matchesQuery(p.full_name, p.procedure_name));
+  const shownEscalations = escalations?.filter(
+    (e) => (severity === "all" || e.severity === severity) && matchesQuery(e.patient_name, procedureOf.get(e.patient_id)),
+  );
+  const narrowedQueue = severity !== "all" || q !== "";
+
   return (
     <>
       <AppHeader user={session.user} />
@@ -181,7 +196,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
               <p className="text-ink-soft">
                 Here&rsquo;s who needs you. Foggy answers from each patient&rsquo;s plan and offers to message you
                 when it can&rsquo;t; nothing is sent without the patient&rsquo;s OK.
-</p>
+              </p>
             </div>
             <DemoResetControl variant="button" onReset={onDemoReset} />
           </div>
@@ -199,15 +214,43 @@ export function ClinicianDashboard({ session }: { session: Session }) {
             />
           </dl>
 
+          <div className="mt-6 flex flex-col gap-1.5 sm:max-w-md">
+            <label htmlFor="patient-search" className="text-sm font-bold text-ink-soft">
+              Search patients
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-brand-gray"
+                aria-hidden="true"
+              />
+              <Input
+                id="patient-search"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Name or procedure"
+                autoComplete="off"
+                className="pl-10"
+                aria-describedby="patient-search-hint"
+              />
+            </div>
+            <p id="patient-search-hint" className="text-xs text-brand-gray">
+              Filters the queue and the patient list.
+            </p>
+          </div>
+
           {/* grid-cols-1 (minmax(0,1fr)) matters: an implicit auto column grows to the widest
               nowrap text inside it, which pushed phones out to ~750 px. */}
           <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
             <EscalationQueue
-              items={escalations}
+              items={shownEscalations}
               loading={escalations === undefined}
               error={queueError}
               filter={filter}
               onFilter={changeFilter}
+              severity={severity}
+              onSeverity={setSeverity}
+              narrowed={narrowedQueue}
               onUpdate={onUpdate}
               onOpenPatient={setSelectedId}
               highlightIds={highlight}
@@ -216,12 +259,14 @@ export function ClinicianDashboard({ session }: { session: Session }) {
             />
             <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
               <PatientTable
-                rows={patients}
+                rows={shownPatients}
                 active={active}
                 loading={patients === undefined}
                 error={patientsError}
                 now={now}
                 onOpen={(r) => setSelectedId(r.id)}
+                emptyFiltered={Boolean(patients?.length) && q !== ""}
+                riskInfo={<RiskInfo />}
               />
             </div>
           </div>

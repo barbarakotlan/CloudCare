@@ -60,6 +60,12 @@ export function PatientTable({
 
       {sorted && sorted.length > 0 ? (
         <>
+          {riskInfo ? (
+            <p className="mb-2 flex items-center gap-1 text-xs text-brand-gray md:hidden">
+              Risk model: the model&rsquo;s estimate at the last check-in
+              {riskInfo}
+            </p>
+          ) : null}
           {/* Mobile: cards */}
           <ul className="flex flex-col gap-2 md:hidden">
             {sorted.map((r) => (

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Patient, User
+from app.outreach.phone import PhoneError, normalize_e164
 
 log = logging.getLogger("cloudcare.auth")
 
@@ -167,6 +168,7 @@ def _decode_supabase(token: str) -> dict:
     user_metadata = claims.get("user_metadata") or {}
     role = app_metadata.get("role") if isinstance(app_metadata, dict) else None
     full_name = user_metadata.get("full_name") if isinstance(user_metadata, dict) else None
+    phone = user_metadata.get("phone") if isinstance(user_metadata, dict) else None
     email = claims.get("email")
     return {
         "provider": "supabase",
@@ -174,6 +176,8 @@ def _decode_supabase(token: str) -> dict:
         "email": email.strip().lower() if isinstance(email, str) and email.strip() else None,
         "role": role if role in VALID_ROLES else None,
         "full_name": full_name.strip() if isinstance(full_name, str) and full_name.strip() else None,
+        # The mobile number typed at sign-up. Contact info only, never used for authorization.
+        "phone": phone if isinstance(phone, str) else None,
     }
 
 
@@ -199,7 +203,18 @@ def _first_clinician(db: Session) -> User | None:
     return db.scalar(select(User).where(User.role == "clinician").order_by(User.created_at).limit(1))
 
 
-def _ensure_patient_profile(db: Session, user: User) -> None:
+def _signup_phone(raw: str | None) -> str | None:
+    """The sign-up mobile number in E.164, or None if missing or unusable (never blocks sign-in)."""
+    if not raw:
+        return None
+    try:
+        return normalize_e164(raw)
+    except PhoneError:
+        log.info("Ignoring a sign-up phone number that isn't a usable mobile number.")
+        return None
+
+
+def _ensure_patient_profile(db: Session, user: User, phone: str | None = None) -> None:
     """Gives a new patient a placeholder profile so /patients/me works on first login."""
     if db.scalar(select(Patient.id).where(Patient.user_id == user.id)) is not None:
         return
@@ -212,6 +227,7 @@ def _ensure_patient_profile(db: Session, user: User) -> None:
             procedure_type="unknown",
             surgery_date=date.today(),
             comorbidities=[],
+            phone=_signup_phone(phone),
         )
     )
     if clinician is None:
@@ -252,7 +268,7 @@ def _user_from_supabase(db: Session, claims: dict) -> User:
     try:
         db.flush()
         if user.role == "patient":
-            _ensure_patient_profile(db, user)
+            _ensure_patient_profile(db, user, claims.get("phone"))
         db.commit()
     except IntegrityError:
         # Two first requests raced to create the same user; use the winner's row.

@@ -10,7 +10,7 @@ import {
   Thermometer,
   UserRoundPen,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { fromApiMessage } from "@/components/chat/types";
 import { Badge } from "@/components/ui/Badge";
@@ -36,6 +36,7 @@ import {
   factorLabel,
   formatDate,
   formatDateTime,
+  humanizeFactors,
   MOBILITY_LABEL,
   relativeTime,
   RISK_LABEL,
@@ -69,10 +70,16 @@ export function PatientDrawer({
   onProfileSaved: (patient: PatientOut) => void;
 }) {
   const pending = row?.procedure_name === PENDING_SETUP_PROCEDURE;
+  // An unsaved care-plan draft in the Care plan tab; closing asks first.
+  const draftDirty = useRef(false);
   return (
     <Modal
       open={patientId !== null}
-      onClose={onClose}
+      onClose={() => {
+        draftDirty.current = false;
+        onClose();
+      }}
+      confirmClose={() => !draftDirty.current || window.confirm(DISCARD_DRAFT)}
       variant="drawer"
       title={row?.full_name ?? "Patient"}
       description={row && !pending ? row.procedure_name : undefined}
@@ -98,11 +105,16 @@ export function PatientDrawer({
           escalations={escalations}
           now={now}
           onProfileSaved={onProfileSaved}
+          onDraftChange={(dirty) => {
+            draftDirty.current = dirty;
+          }}
         />
       ) : null}
     </Modal>
   );
 }
+
+const DISCARD_DRAFT = "Discard the care plan you haven't saved?";
 
 /** Patients who signed up before their care team added a procedure. */
 export function FinishSetupBadge({ className }: { className?: string }) {
@@ -161,15 +173,28 @@ function DrawerBody({
   escalations,
   now,
   onProfileSaved,
+  onDraftChange,
 }: {
   patientId: string;
   row: PatientRow | undefined;
   escalations: EscalationOut[];
   now: number | null;
   onProfileSaved: (patient: PatientOut) => void;
+  onDraftChange: (dirty: boolean) => void;
 }) {
   // New sign-ups land on the profile form first.
   const [tab, setTab] = useState<Tab>(row?.procedure_name === PENDING_SETUP_PROCEDURE ? "profile" : "overview");
+  const [planDirty, setPlanDirty] = useState(false);
+
+  function changeTab(next: Tab) {
+    if (tab === "plan" && next !== "plan" && planDirty && !window.confirm(DISCARD_DRAFT)) return;
+    setTab(next);
+  }
+
+  function onPlanDirty(dirty: boolean) {
+    setPlanDirty(dirty);
+    onDraftChange(dirty);
+  }
   const profile = useAsync(`patient:${patientId}`, (s) => getPatient(patientId, s));
   const plan = useAsync<PlanState>(`patient-plan:${patientId}`, async (s) => {
     try {
@@ -196,7 +221,7 @@ function DrawerBody({
           label="Patient details"
           size="sm"
           value={tab}
-          onChange={setTab}
+          onChange={changeTab}
           className="min-w-max sm:min-w-0"
           options={[
             { value: "overview", label: "Overview" },
@@ -285,11 +310,12 @@ function DrawerBody({
                         <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
                           <span
                             className="block h-full rounded-full bg-brand-cyan"
-                            style={{ width: `${Math.min(100, Math.round(f.impact * 250))}%` }}
+                            style={{ width: `${Math.min(100, Math.round(Math.abs(f.impact) * 250))}%` }}
                           />
                         </span>
                         <span className="w-12 text-right text-xs font-bold text-brand-gray tabular-nums">
-                          +{Math.round(f.impact * 100)}
+                          {f.impact >= 0 ? "+" : "−"}
+                          {Math.abs(Math.round(f.impact * 100))}
                         </span>
                       </li>
                     ))}
@@ -314,7 +340,7 @@ function DrawerBody({
                     <TriggerLabel trigger={e.trigger_type} />
                     <span className="ml-auto text-xs text-brand-gray">{STATUS_LABEL[e.status]}</span>
                   </div>
-                  <p className="mt-1 text-ink-soft">{e.summary}</p>
+                  <p className="mt-1 break-words text-ink-soft">{humanizeFactors(e.summary)}</p>
                 </li>
               ))}
             </ul>
@@ -371,7 +397,9 @@ function DrawerBody({
           {chat.error ? <p role="alert" className="text-sm text-brand-red-dark">{chat.error}</p> : null}
           {chat.data && chat.data.length === 0 ? <p className="text-sm text-brand-gray">No messages yet.</p> : null}
           <div className="flex flex-col gap-3">
-            {chat.data?.map((m) => <MessageBubble key={m.id} message={fromApiMessage(m)} transcript />)}
+            {chat.data?.map((m) => (
+              <MessageBubble key={m.id} message={fromApiMessage(m)} transcript patientName={row?.full_name ?? profile.data?.full_name} />
+            ))}
           </div>
         </section>
       ) : null}
@@ -406,6 +434,7 @@ function DrawerBody({
               patientName={name}
               hasPlan={hasPlan}
               onSaved={(saved) => plan.setData(() => ({ kind: "ok", plan: saved }))}
+              onDirtyChange={onPlanDirty}
             />
           </section>
         </>

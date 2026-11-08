@@ -71,7 +71,11 @@ export function GreetingBanner({
 
       <div className="mt-7 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-8">
         <div className="flex items-baseline gap-2">
-          <span className="text-5xl leading-none font-black text-brand-cyan">{day ?? "–"}</span>
+          {day === null && !error ? (
+            <Skeleton className="h-12 w-12" />
+          ) : (
+            <span className="text-5xl leading-none font-black text-brand-cyan">{day ?? "–"}</span>
+          )}
           <span className="font-bold text-ink-soft">
             {day === 1 ? "day" : "days"} since surgery
           </span>

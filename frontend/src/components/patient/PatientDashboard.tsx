@@ -110,15 +110,15 @@ export function PatientDashboard({ session }: { session: Session }) {
           </div>
 
           {isDemoEmail(session.user.email) ? (
-            <footer className="mt-10 border-t border-line/70 pt-6">
-              <DemoResetControl
-                variant="link"
-                onReset={() => {
-                  // Chat, check-ins and doses all changed underneath this page: start fresh.
-                  window.location.reload();
-                }}
-              />
-            </footer>
+            // Renders nothing (no divider either) when the server has no reset route.
+            <DemoResetControl
+              variant="link"
+              className="mt-10 border-t border-line/70 pt-6"
+              onReset={() => {
+                // Chat, check-ins and doses all changed underneath this page: start fresh.
+                window.location.reload();
+              }}
+            />
           ) : null}
         </div>
       </main>

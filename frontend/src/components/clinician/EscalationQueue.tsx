@@ -10,7 +10,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { EscalationOut, EscalationStatus, EscalationTrigger } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
-import { formatDateTime, relativeTime, SEVERITY_LABEL, TRIGGER_LABEL } from "@/lib/format";
+import { formatDateTime, humanizeFactors, relativeTime, SEVERITY_LABEL, TRIGGER_LABEL } from "@/lib/format";
 import { SEVERITY_BAR, SEVERITY_TONE, STATUS_LABEL, STATUS_TONE, TRIGGER_TONE } from "./severity";
 
 export type QueueFilter = "active" | "resolved" | "all";
@@ -194,7 +194,7 @@ function EscalationItem({
           {now !== null ? relativeTime(item.created_at, now) : formatDateTime(item.created_at)}
         </span>
       </div>
-      <p className="mt-1 leading-relaxed break-words text-ink-soft">{item.summary}</p>
+      <p className="mt-1 leading-relaxed break-words text-ink-soft">{humanizeFactors(item.summary)}</p>
       {item.clinician_notes ? (
         <p className="mt-2 rounded-2xl bg-surface-soft px-3 py-2 text-sm break-words text-ink-soft">
           <span className="font-bold text-ink">Note: </span>

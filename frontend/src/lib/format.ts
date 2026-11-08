@@ -80,7 +80,32 @@ export const FACTOR_LABEL: Record<string, string> = {
 };
 
 export function factorLabel(feature: string) {
-  return FACTOR_LABEL[feature] ?? feature.replace(/_/g, " ");
+  const label = FACTOR_LABEL[feature];
+  if (label) return label;
+  const words = feature.replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** snake_case tokens such as `shortness_of_breath` or `temperature_f`. */
+const FEATURE_TOKEN = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g;
+
+/**
+ * Server-written text names model features raw ("Top factors: shortness_of_breath,
+ * temperature_f"). Swap them for the labels people read everywhere else.
+ */
+export function humanizeFactors(text: string): string {
+  return text.replace(FEATURE_TOKEN, (token) => factorLabel(token));
+}
+
+/** Message timestamp: time only for today, date and time otherwise. */
+export function formatMessageTime(value: string | Date, now: number | null = null) {
+  const d = typeof value === "string" ? parseApiDate(value) : value;
+  const today = new Date(now ?? Date.now());
+  const sameDay =
+    d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  return sameDay
+    ? d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export const RISK_LABEL: Record<RiskLevel, string> = { low: "Low risk", medium: "Medium risk", high: "High risk" };

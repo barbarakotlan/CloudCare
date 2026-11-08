@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, FileText, LoaderCircle, Upload } from "lucide-react";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import { errorMessage } from "@/lib/api/client";
@@ -14,12 +14,15 @@ export function CarePlanUpload({
   patientName,
   hasPlan = false,
   onSaved,
+  onDirtyChange,
 }: {
   patientId: string;
   patientName: string;
   /** A plan is already active: word the form as replacing it. */
   hasPlan?: boolean;
   onSaved?: (plan: CarePlanOut) => void;
+  /** True while the instructions box holds text that hasn't been saved. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [title, setTitle] = useState("");
   const [raw, setRaw] = useState("");
@@ -28,6 +31,27 @@ export function CarePlanUpload({
   const [saved, setSaved] = useState<CarePlanOut | null>(null);
   const ids = useId();
   const preview = raw.trim() ? splitIntoChunks(raw) : [];
+  const dirty = !saved && raw.trim() !== "";
+
+  const onDirtyRef = useRef(onDirtyChange);
+  useEffect(() => {
+    onDirtyRef.current = onDirtyChange;
+  });
+  useEffect(() => {
+    onDirtyRef.current?.(dirty);
+  }, [dirty]);
+  // Leaving the drawer (unmount) clears the flag.
+  useEffect(() => () => onDirtyRef.current?.(false), []);
+
+  // Reloading or closing the tab with a draft asks too.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

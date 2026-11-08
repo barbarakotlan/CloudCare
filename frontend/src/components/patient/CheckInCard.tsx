@@ -42,10 +42,11 @@ function painWord(p: number) {
 const RISK_TONE: Record<RiskLevel, BadgeTone> = { low: "green", medium: "amber", high: "red" };
 
 export function CheckInCard({ now }: { now: number | null }) {
-  const [pain, setPain] = useState(3);
+  // No silent defaults: pain and mobility start unanswered.
+  const [pain, setPain] = useState<number | null>(null);
   const [temp, setTemp] = useState("");
   const [flags, setFlags] = useState<Flags>(EMPTY_FLAGS);
-  const [mobility, setMobility] = useState(3);
+  const [mobility, setMobility] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +56,13 @@ export function CheckInCard({ now }: { now: number | null }) {
 
   const tempNum = temp.trim() === "" ? null : Number(temp);
   const tempInvalid = tempNum !== null && (!Number.isFinite(tempNum) || tempNum < 90 || tempNum > 110);
+  const unanswered = [pain === null && "pain", mobility === null && "getting around"].filter(
+    (q): q is string => Boolean(q),
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (tempInvalid || submitting) return;
+    if (tempInvalid || submitting || pain === null || mobility === null) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -81,10 +85,10 @@ export function CheckInCard({ now }: { now: number | null }) {
 
   function reset() {
     setResult(null);
-    setPain(3);
+    setPain(null);
     setTemp("");
     setFlags(EMPTY_FLAGS);
-    setMobility(3);
+    setMobility(null);
     setNotes("");
   }
 
@@ -113,17 +117,23 @@ export function CheckInCard({ now }: { now: number | null }) {
               <label htmlFor={`${ids}-pain`} className="text-sm font-bold text-ink-soft">
                 Pain right now
               </label>
-              <p aria-hidden="true" className="text-right leading-none">
-                <span
-                  className={cn(
-                    "text-3xl font-black",
-                    pain >= 7 ? "text-brand-red" : pain >= 4 ? "text-sev-medium" : "text-brand-cyan",
-                  )}
-                >
-                  {pain}
-                </span>
-                <span className="text-sm font-bold text-brand-gray">/10 · {painWord(pain)}</span>
-              </p>
+              {pain === null ? (
+                <p id={`${ids}-pain-hint`} className="text-sm font-bold text-[#7d5600]">
+                  Choose a number
+                </p>
+              ) : (
+                <p aria-hidden="true" className="text-right leading-none">
+                  <span
+                    className={cn(
+                      "text-3xl font-black",
+                      pain >= 7 ? "text-brand-red" : pain >= 4 ? "text-sev-medium" : "text-brand-cyan",
+                    )}
+                  >
+                    {pain}
+                  </span>
+                  <span className="text-sm font-bold text-brand-gray">/10 · {painWord(pain)}</span>
+                </p>
+              )}
             </div>
             <input
               id={`${ids}-pain`}
@@ -131,10 +141,14 @@ export function CheckInCard({ now }: { now: number | null }) {
               min={0}
               max={10}
               step={1}
-              value={pain}
+              // Unanswered: the thumb rests mid-way, dimmed, until the patient touches it.
+              value={pain ?? 5}
               onChange={(e) => setPain(Number(e.target.value))}
-              aria-valuetext={`${pain} out of 10, ${painWord(pain)}`}
-              className="cc-range mt-3 h-2 w-full cursor-pointer"
+              // A click right on the resting thumb doesn't fire change: count it as an answer too.
+              onPointerUp={(e) => setPain(Number(e.currentTarget.value))}
+              aria-valuetext={pain === null ? "Not answered yet" : `${pain} out of 10, ${painWord(pain)}`}
+              aria-describedby={pain === null ? `${ids}-pain-hint` : undefined}
+              className={cn("cc-range mt-3 h-2 w-full cursor-pointer", pain === null && "opacity-45")}
             />
             <div aria-hidden="true" className="mt-1 flex justify-between text-[0.7rem] font-bold text-brand-gray">
               <span>0</span>
@@ -201,16 +215,23 @@ export function CheckInCard({ now }: { now: number | null }) {
             <Field label="Getting around" htmlFor={`${ids}-mobility`}>
               <select
                 id={`${ids}-mobility`}
-                value={mobility}
-                onChange={(e) => setMobility(Number(e.target.value))}
-                className="h-12 w-full appearance-none rounded-2xl border border-line bg-white bg-[length:16px] bg-[right_1rem_center] bg-no-repeat px-4 pr-10 text-[0.98rem] text-ink focus:border-brand-cyan focus:outline-none"
+                value={mobility ?? ""}
+                onChange={(e) => setMobility(e.target.value === "" ? null : Number(e.target.value))}
+                required
+                className={cn(
+                  "h-12 w-full appearance-none rounded-2xl border border-line bg-white bg-[length:16px] bg-[right_1rem_center] bg-no-repeat px-4 pr-10 text-[0.98rem] focus:border-brand-cyan focus:outline-none",
+                  mobility === null ? "text-brand-gray" : "text-ink",
+                )}
                 style={{
                   backgroundImage:
                     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23636363' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
                 }}
               >
+                <option value="" disabled>
+                  Choose one
+                </option>
                 {MOBILITY_LABEL.map((label, i) => (
-                  <option key={label} value={i}>
+                  <option key={label} value={i} className="text-ink">
                     {label}
                   </option>
                 ))}
@@ -240,10 +261,23 @@ export function CheckInCard({ now }: { now: number | null }) {
             </p>
           ) : null}
 
-          <Button type="submit" size="lg" disabled={submitting || tempInvalid} className="w-full sm:w-auto sm:self-start">
-            {submitting ? <LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> : null}
-            {submitting ? "Sending…" : "Send check-in"}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={submitting || tempInvalid || unanswered.length > 0}
+              aria-describedby={unanswered.length > 0 ? `${ids}-missing` : undefined}
+              className="w-full sm:w-auto"
+            >
+              {submitting ? <LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> : null}
+              {submitting ? "Sending…" : "Send check-in"}
+            </Button>
+            {unanswered.length > 0 ? (
+              <p id={`${ids}-missing`} className="text-sm text-brand-gray">
+                Answer {unanswered.join(" and ")} to send.
+              </p>
+            ) : null}
+          </div>
         </form>
       )}
     </Card>

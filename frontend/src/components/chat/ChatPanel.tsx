@@ -145,7 +145,12 @@ export function ChatPanel({
           </p>
         ) : null}
         {patientCount < 2 && !historyLoading && !inCheckin && !showQuickReplies ? (
-          <div className="-mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Suggested questions">
+          // Scrollbar hidden, edges faded; buttons stay reachable by Tab (focus scrolls them into view) and swipe.
+          <div
+            role="group"
+            className="-mx-3 mb-2.5 flex scroll-px-3 gap-2 overflow-x-auto px-3 pb-1 [mask-image:linear-gradient(to_right,transparent,#000_12px,#000_calc(100%-28px),transparent)] [scrollbar-width:none] sm:-mx-4 sm:scroll-px-4 sm:px-4 [&::-webkit-scrollbar]:hidden"
+            aria-label="Suggested questions"
+          >
             {suggestions.map((s) => (
               <button
                 key={s}

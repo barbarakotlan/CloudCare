@@ -32,9 +32,12 @@ export function Modal({
   className,
   bodyClassName,
   headerExtra,
+  confirmClose,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Return false to keep the dialog open (e.g. an unsaved draft the user wants to keep). */
+  confirmClose?: () => boolean;
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
@@ -47,10 +50,17 @@ export function Modal({
   const titleId = useId();
   const descId = useId();
   const onCloseRef = useRef(onClose);
+  const confirmRef = useRef(confirmClose);
 
   useEffect(() => {
     onCloseRef.current = onClose;
-  }, [onClose]);
+    confirmRef.current = confirmClose;
+  }, [onClose, confirmClose]);
+
+  function requestClose() {
+    if (confirmClose && !confirmClose()) return;
+    onClose();
+  }
 
   useEffect(() => {
     const dialog = ref.current;
@@ -68,8 +78,17 @@ export function Modal({
     const dialog = ref.current;
     if (!dialog) return;
     const handleClose = () => onCloseRef.current();
+    // Escape fires "cancel" first; keep the dialog open when the owner says so.
+    const handleCancel = (e: Event) => {
+      const confirm = confirmRef.current;
+      if (confirm && !confirm()) e.preventDefault();
+    };
     dialog.addEventListener("close", handleClose);
-    return () => dialog.removeEventListener("close", handleClose);
+    dialog.addEventListener("cancel", handleCancel);
+    return () => {
+      dialog.removeEventListener("close", handleClose);
+      dialog.removeEventListener("cancel", handleCancel);
+    };
   }, []);
 
   return (
@@ -79,7 +98,7 @@ export function Modal({
       aria-describedby={description ? descId : undefined}
       onClick={(e) => {
         // Click on the backdrop (the dialog element itself, outside the panel) closes.
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
       className={cn(
         "overflow-hidden border-0 bg-white p-0 shadow-lift backdrop:bg-transparent open:flex open:flex-col",
@@ -103,7 +122,7 @@ export function Modal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               aria-label="Close"
               className="grid size-10 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-pale hover:text-ink"
             >

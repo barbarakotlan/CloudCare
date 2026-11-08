@@ -268,6 +268,19 @@ export function TestOnPhoneCard() {
         description={showText ? "Check in here, or have Foggy text or call you." : "Check in here, or have Foggy call you."}
       />
 
+      {/* What each option does, before asking for a number. */}
+      <p className="mb-4 text-sm leading-relaxed text-ink-soft">
+        <span className="font-bold text-ink">Call me</span> places a real phone call from Foggy to this number using
+        the same care plan. <span className="font-bold text-ink">Check in here</span> uses this screen.{" "}
+        {showText ? (
+          <>
+            <span className="font-bold text-ink">Text me</span> sends a text with a link to your check-in.{" "}
+          </>
+        ) : null}
+        <span className="font-bold text-ink">Talk to Foggy</span> on this page uses your browser microphone, not your
+        phone.
+      </p>
+
       {/* Number on file */}
       <div className="rounded-3xl bg-surface-pale p-4">
         {editing ? (

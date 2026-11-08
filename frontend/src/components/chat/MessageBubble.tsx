@@ -1,6 +1,7 @@
 import { BellRing, BookOpen, CircleSlash, FlaskConical, Inbox, Phone, Send, Siren, Stethoscope, type LucideIcon } from "lucide-react";
 import { useId } from "react";
 import { cn } from "@/lib/cn";
+import { firstName, formatMessageTime } from "@/lib/format";
 import { FoggyAvatar } from "./FoggyAvatar";
 import { isEmergency, type UiMessage } from "./types";
 
@@ -122,20 +123,44 @@ export function MessageBubble({
   message,
   showAvatar = true,
   transcript = false,
+  patientName,
 }: {
   message: UiMessage;
   showAvatar?: boolean;
   /** Read-only transcript for clinicians: no 911 banner or dialer link, just a tag. */
   transcript?: boolean;
+  /** Transcript only: who the patient is, so their messages are labelled by name. */
+  patientName?: string;
 }) {
   const mine = message.role === "patient";
   const clinician = message.role === "clinician";
   const emergency = isEmergency(message);
+  const speaker = mine
+    ? transcript
+      ? patientName
+        ? firstName(patientName)
+        : "Patient"
+      : "You"
+    : clinician
+      ? "Care team"
+      : "Foggy";
+  const time = message.createdAt ? formatMessageTime(message.createdAt) : null;
+  // Patient chat: a quiet time beside the bubble on hover or keyboard focus.
+  const hoverTime =
+    !transcript && time ? (
+      <time
+        dateTime={message.createdAt}
+        className="mb-1 shrink-0 text-[0.68rem] font-semibold whitespace-nowrap text-brand-gray opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none"
+      >
+        {time}
+      </time>
+    ) : null;
 
   return (
-    <div className="flex animate-bubble-in flex-col gap-2">
+    <div className="group flex animate-bubble-in flex-col gap-2">
       {emergency && !transcript ? <EmergencyBanner className="ml-10 sm:max-w-md" /> : null}
       <div className={cn("flex items-end gap-2", mine ? "justify-end" : "justify-start")}>
+        {mine ? hoverTime : null}
         {!mine && showAvatar ? (
           clinician ? (
             <span
@@ -151,7 +176,7 @@ export function MessageBubble({
           <span className="size-8 shrink-0" aria-hidden="true" />
         ) : null}
         <div className={cn("flex max-w-[82%] min-w-0 flex-col gap-1.5", mine ? "items-end" : "items-start")}>
-          <span className="sr-only">{mine ? "You said:" : clinician ? "Care team said:" : "Foggy said:"}</span>
+          <span className="sr-only">{speaker} said:</span>
           <div
             className={cn(
               "rounded-[1.25rem] px-4 py-2.5 text-[0.95rem] leading-relaxed break-words whitespace-pre-wrap",
@@ -166,7 +191,19 @@ export function MessageBubble({
           </div>
           {!mine ? <ReplyChips message={message} transcript={transcript} /> : null}
           {message.failed ? <p className="text-xs font-bold text-brand-red-dark">Not sent</p> : null}
+          {transcript ? (
+            <p aria-hidden="true" className="px-1 text-[0.7rem] font-semibold text-brand-gray">
+              {speaker}
+              {time ? (
+                <>
+                  {" · "}
+                  <time dateTime={message.createdAt}>{time}</time>
+                </>
+              ) : null}
+            </p>
+          ) : null}
         </div>
+        {!mine ? hoverTime : null}
       </div>
     </div>
   );

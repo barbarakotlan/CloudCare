@@ -293,7 +293,9 @@ export function LoginForm() {
           {submitLabel}
         </Button>
 
-        {CAN_SIGN_UP ? (
+        {!signingUp && role === "clinician" ? (
+          <p className="text-center text-sm text-ink-soft">Care team accounts are created by your clinic.</p>
+        ) : CAN_SIGN_UP ? (
           <p className="text-center text-sm text-ink-soft">
             {signingUp ? "Already have an account?" : "New patient?"}{" "}
             <Button
@@ -316,9 +318,6 @@ export function LoginForm() {
             <code className="font-semibold text-brand-cyan-strong">{DEMO[role].email}</code> · password{" "}
             <code className="font-semibold text-brand-cyan-strong">{DEMO[role].password}</code>
           </p>
-          {AUTH_PROVIDER_NAME === "supabase" ? (
-            <p className="mt-2 text-xs text-brand-gray">Signing in with Supabase.</p>
-          ) : null}
         </div>
       )}
     </div>

@@ -36,6 +36,35 @@ const FAILURE_TITLE: Record<Answer, string> = {
   pending: "Couldn’t undo that dose",
 };
 
+/** How a dose reads to the patient right now. */
+type DoseState = "scheduled" | "due" | "overdue" | "taken" | "skipped" | "missed";
+
+const OVERDUE_AFTER_MS = 60 * 60 * 1000;
+
+function doseState(dose: Dose, now: number | null): DoseState {
+  if (dose.status === "taken" || dose.status === "skipped" || dose.status === "missed") return dose.status;
+  if (now === null || dose.at > now) return "scheduled";
+  return now - dose.at > OVERDUE_AFTER_MS ? "overdue" : "due";
+}
+
+const DOSE_STATE_LABEL: Record<DoseState, string> = {
+  scheduled: "scheduled",
+  due: "due now",
+  overdue: "overdue",
+  taken: "taken",
+  skipped: "skipped",
+  missed: "missed",
+};
+
+const DOSE_STATE_CLASS: Record<DoseState, string> = {
+  scheduled: "text-brand-gray",
+  due: "text-[#7d5600]",
+  overdue: "text-brand-red-dark",
+  taken: "text-[#146b49]",
+  skipped: "text-brand-gray",
+  missed: "text-brand-red-dark",
+};
+
 /** Replace any log for the same dose with `log`. */
 function upsertLog(list: MedicationLog[] | undefined, log: MedicationLog): MedicationLog[] {
   const key = logKey(log.medication_id, log.scheduled_for);
@@ -155,10 +184,11 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
       {!scheduleError && doses && doses.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {doses.map((dose) => {
-            const taken = dose.status === "taken";
-            const skipped = dose.status === "skipped";
-            const answered = skipped || dose.status === "missed";
-            const due = dose.status === "pending" && now !== null && dose.at <= now;
+            const state = doseState(dose, now);
+            const taken = state === "taken";
+            const skipped = state === "skipped";
+            const answered = skipped || state === "missed";
+            const due = state === "due" || state === "overdue";
             const busy = saving.has(dose.key);
             const label = `${dose.medication.name} ${formatClock(dose.time)}`;
             return (
@@ -166,34 +196,50 @@ export function RemindersCard({ now, notify }: { now: number | null; notify: Not
                 key={dose.key}
                 className={cn(
                   "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl px-3 py-2.5 ring-1 transition-colors sm:flex-nowrap sm:px-4",
-                  taken || answered
-                    ? "bg-surface-soft ring-line/50"
-                    : due
-                      ? "bg-sev-medium/8 ring-sev-medium/25"
-                      : "bg-white ring-line",
+                  taken
+                    ? "bg-ok/6 ring-ok/20"
+                    : answered
+                      ? "bg-surface-soft ring-line/50"
+                      : state === "overdue"
+                        ? "bg-brand-red/5 ring-brand-red/20"
+                        : state === "due"
+                          ? "bg-sev-medium/8 ring-sev-medium/25"
+                          : "bg-white ring-line",
                 )}
               >
                 <span
                   className={cn(
                     "grid size-10 shrink-0 place-items-center rounded-xl",
-                    taken ? "bg-ok/12 text-ok" : answered ? "bg-white text-brand-gray" : "bg-surface-pale text-brand-cyan-strong",
+                    taken
+                      ? "bg-ok/15 text-[#146b49]"
+                      : answered
+                        ? "bg-white text-brand-gray"
+                        : "bg-surface-pale text-brand-cyan-strong",
                   )}
                 >
-                  {taken ? <Check className="size-5" aria-hidden="true" /> : <Pill className="size-5" aria-hidden="true" />}
+                  {taken ? (
+                    <Check className="size-5" strokeWidth={3} aria-hidden="true" />
+                  ) : (
+                    <Pill className="size-5" aria-hidden="true" />
+                  )}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p
-                    className={cn("truncate font-bold text-ink", taken && "text-brand-gray line-through decoration-2")}
+                    className={cn("truncate font-bold", taken || answered ? "text-ink-soft" : "text-ink")}
                     title={`${dose.medication.name} ${dose.medication.dosage}`}
                   >
-                    {dose.medication.name} <span className="font-semibold text-ink-soft">{dose.medication.dosage}</span>
+                    {dose.medication.name}{" "}
+                    <span className={cn("font-semibold", taken || answered ? "text-brand-gray" : "text-ink-soft")}>
+                      {dose.medication.dosage}
+                    </span>
                   </p>
                   <p className="flex items-center gap-1 text-xs whitespace-nowrap text-brand-gray">
                     <Clock3 className="size-3.5" aria-hidden="true" />
                     {formatClock(dose.time)}
-                    {due ? <span className="font-bold text-[#7d5600]"> · due now</span> : null}
-                    {answered ? <span className="font-semibold"> · {dose.status}</span> : null}
-                    {taken ? <span className="font-semibold text-[#146b49] sm:hidden"> · taken</span> : null}
+                    <span className={cn("font-bold", DOSE_STATE_CLASS[state], taken && "sm:hidden")}>
+                      {" "}
+                      · {DOSE_STATE_LABEL[state]}
+                    </span>
                   </p>
                 </div>
                 {taken ? (

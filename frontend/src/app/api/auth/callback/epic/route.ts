@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { BACKEND_TIMEOUT_MS, cloudcareApiUrl } from "@/lib/server/cloudcareApi";
+import { EPIC_STATE_COOKIE, EPIC_STATE_COOKIE_PATH, stateMatches } from "@/lib/server/epicState";
 
 // Epic redirects the browser here after MyChart sign-in (this is the redirect URI
 // registered on the Epic app). We hand `code` + `state` to FastAPI server to
@@ -19,6 +20,7 @@ const KNOWN_REASONS = new Set([
   "missing_code",
   "invalid_state",
   "expired_state",
+  "state_mismatch",
   "iss_mismatch",
   "redirect_uri_mismatch",
   "no_patient",
@@ -32,21 +34,30 @@ const KNOWN_REASONS = new Set([
 ]);
 
 function finish(request: NextRequest, outcome: { ok: true } | { ok: false; reason: string }) {
-  const target = new URL(DASHBOARD, request.nextUrl.origin);
+  const params = new URLSearchParams();
   if (outcome.ok) {
-    target.searchParams.set("epic", "connected");
+    params.set("epic", "connected");
   } else {
-    target.searchParams.set("epic", "error");
-    target.searchParams.set("reason", KNOWN_REASONS.has(outcome.reason) ? outcome.reason : "connect_failed");
+    params.set("epic", "error");
+    params.set("reason", KNOWN_REASONS.has(outcome.reason) ? outcome.reason : "connect_failed");
   }
   // Sign-in usually runs in a popup. The dashboard checks for an opener and,
   // if there is one, hands it the result and closes; otherwise it loads normally.
-  target.searchParams.set("popup", "1");
+  params.set("popup", "1");
 
-  const response = NextResponse.redirect(target, 303);
-  response.headers.set("Cache-Control", "no-store");
-  // The URL we were called with carries the authorization code; don't leak it.
-  response.headers.set("Referrer-Policy", "no-referrer");
+  // A fixed, relative Location: the destination never depends on the request's Host
+  // header or on anything Epic or the backend sent, so this can't become an open redirect.
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: {
+      Location: `${DASHBOARD}?${params.toString()}`,
+      "Cache-Control": "no-store",
+      // The URL we were called with carries the authorization code; don't leak it.
+      "Referrer-Policy": "no-referrer",
+    },
+  });
+  // The binding cookie is single use, whatever the outcome.
+  response.cookies.set(EPIC_STATE_COOKIE, "", { path: EPIC_STATE_COOKIE_PATH, maxAge: 0 });
   if (outcome.ok) {
     // UX hint only ("just connected"); holds nothing sensitive.
     response.cookies.set("cloudcare_epic", "connected", {
@@ -71,6 +82,11 @@ export async function GET(request: NextRequest) {
   const code = params.get("code");
   const state = params.get("state");
   if (!code || !state) return finish(request, { ok: false, reason: "missing_code" });
+
+  // Only the browser that started this sign-in may finish it (see lib/server/epicState.ts).
+  if (!stateMatches(request.cookies.get(EPIC_STATE_COOKIE)?.value, state)) {
+    return finish(request, { ok: false, reason: "state_mismatch" });
+  }
 
   const body: { code: string; state: string; iss?: string } = { code, state };
   const iss = params.get("iss");

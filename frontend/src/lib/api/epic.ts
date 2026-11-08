@@ -111,6 +111,8 @@ export function epicErrorText(reason: string | null): string {
       return "The sign-in took longer than 10 minutes. Please try again.";
     case "invalid_state":
       return "That sign-in link was already used or isn't valid. Please try again.";
+    case "state_mismatch":
+      return "That MyChart sign-in wasn't started in this browser. Start it again from your CloudCare dashboard.";
     case "iss_mismatch":
     case "redirect_uri_mismatch":
       return "MyChart sent you back to an unexpected place, so we stopped. Please try again.";

@@ -87,7 +87,8 @@ def test_seed_creates_supabase_users_and_aligns_local_ids():
     assert str(patient.id) == PATIENT_ID
     assert str(clinician.id) == CLINICIAN_ID
     assert db.scalar(select(Patient).where(Patient.user_id == patient.id)).clinician_id == clinician.id
-    assert len(db.scalars(select(User)).all()) == 2
+    # Exactly the two Supabase-backed demo accounts (the seed also adds a local-only demo cohort).
+    assert len(db.scalars(select(User).where(User.email.in_(["patient@demo.com", "clinician@demo.com"]))).all()) == 2
 
     first_post = fake.requests[0]
     assert first_post.headers["apikey"] == "sb_secret_test_value"
@@ -135,7 +136,8 @@ def test_admin_api_down_does_not_break_startup():
         seed.seed_demo_users(db)
     finally:
         seed.httpx.Client = real_client
-    assert len(db.scalars(select(User)).all()) == 2
+    # Exactly the two Supabase-backed demo accounts (the seed also adds a local-only demo cohort).
+    assert len(db.scalars(select(User).where(User.email.in_(["patient@demo.com", "clinician@demo.com"]))).all()) == 2
 
 
 def test_no_env_means_no_calls():

@@ -1,13 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_patient, get_patient_for_clinician, require_clinician
 from app.database import get_db
 from app.models import CarePlan, CarePlanChunk, Escalation, Patient, RiskScore, SymptomLog, User
-from app.schemas import CarePlanIn, CarePlanOut, PatientOut, PatientRow, RiskOut
+from app.schemas import CarePlanIn, CarePlanOut, PatientOut, PatientRow, PatientUpdate, RiskOut
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -55,6 +55,56 @@ def my_care_plan(db: Session = Depends(get_db), patient: Patient = Depends(get_c
 @router.get("/{patient_id}", response_model=PatientOut)
 def get_patient(patient_id: uuid.UUID, db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
     return to_patient_out(get_patient_for_clinician(db, clinician, patient_id))
+
+
+@router.patch("/{patient_id}", response_model=PatientOut)
+def update_patient(
+    patient_id: uuid.UUID,
+    body: PatientUpdate,
+    db: Session = Depends(get_db),
+    clinician: User = Depends(require_clinician),
+):
+    """Clinician edits an assigned patient's profile. Only the fields sent change.
+
+    procedure_name, procedure_type, surgery_date and comorbidities can't be blank, so a
+    null for them is ignored; a null discharge_date or date_of_birth clears it.
+    """
+    patient = get_patient_for_clinician(db, clinician, patient_id)
+    changes = body.model_dump(exclude_unset=True)
+
+    for field in ("procedure_name", "procedure_type"):
+        value = changes.get(field)
+        if value is not None:
+            if not value.strip():
+                raise HTTPException(422, f"{field} can't be blank")
+            setattr(patient, field, value.strip())
+    if changes.get("surgery_date") is not None:
+        patient.surgery_date = changes["surgery_date"]
+    for field in ("discharge_date", "date_of_birth"):
+        if field in changes:
+            setattr(patient, field, changes[field])
+    if changes.get("comorbidities") is not None:
+        cleaned: list[str] = []
+        for item in changes["comorbidities"]:
+            item = item.strip()
+            if item and item.lower() not in (c.lower() for c in cleaned):
+                cleaned.append(item)
+        patient.comorbidities = cleaned
+
+    if patient.discharge_date and patient.discharge_date < patient.surgery_date:
+        db.rollback()
+        raise HTTPException(422, "discharge_date can't be before surgery_date")
+
+    db.commit()
+    db.refresh(patient)
+    return to_patient_out(patient)
+
+
+@router.get("/{patient_id}/care-plan", response_model=CarePlanOut | None)
+def get_care_plan(patient_id: uuid.UUID, db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
+    """Clinician reads an assigned patient's active care plan (null if none yet)."""
+    patient = get_patient_for_clinician(db, clinician, patient_id)
+    return active_care_plan(db, patient.id)
 
 
 @router.post("/{patient_id}/care-plan", response_model=CarePlanOut, status_code=201)

@@ -42,6 +42,17 @@ class PatientOut(ORM):
     comorbidities: list[str]
 
 
+class PatientUpdate(BaseModel):
+    """Clinician edits a patient's profile (e.g. finishing "Pending clinician setup").
+    Only the fields sent are changed."""
+    procedure_name: str | None = Field(default=None, min_length=1, max_length=200)
+    procedure_type: str | None = Field(default=None, min_length=1, max_length=100)
+    surgery_date: date | None = None
+    discharge_date: date | None = None
+    date_of_birth: date | None = None
+    comorbidities: list[str] | None = None
+
+
 class CarePlanIn(BaseModel):
     title: str
     raw_text: str = Field(min_length=1)
@@ -102,6 +113,13 @@ class SymptomResult(BaseModel):
 
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
+    source: Literal["chat", "voice"] = "chat"  # voice = the spoken Foggy agent's tool call
+
+
+FoggyRoute = Literal[
+    "ANSWER_FROM_PLAN", "NOT_IN_PLAN", "REFUSE_DOSE_CHANGE", "EMERGENCY_911", "START_CHECKIN", "CALL_SURGEON",
+    "OPERATIONAL",
+]
 
 
 class ChatMessageOut(ORM):
@@ -111,12 +129,44 @@ class ChatMessageOut(ORM):
     citations: list[dict]
     answered_from_plan: bool | None
     red_flag: bool
+    route: FoggyRoute | None = None  # Foggy's route for assistant messages; null for older rows
     created_at: datetime
+
+
+class PendingActionOut(BaseModel):
+    """An action Foggy offered and is waiting for the patient to agree to."""
+    kind: Literal["message_care_team"]
+    recipient: Literal["care_team"]
+    reason: str
+
+
+class ActionResultOut(BaseModel):
+    """What actually happened this turn. "sent" = a row is in the care team's queue (not that anyone read it)."""
+    kind: str
+    status: Literal["sent", "failed", "simulated"]
+    detail: str
+
+
+class CheckinOut(BaseModel):
+    step: int | Literal["done"]  # 1 pain, 2 medicines, 3 numbness/tingling/color, 4 falls
+    answers: dict
 
 
 class ChatReply(BaseModel):
     message: ChatMessageOut
-    escalated: bool
+    route: FoggyRoute
+    offer_contact: bool = False
+    pending_action: PendingActionOut | None = None
+    action_result: ActionResultOut | None = None
+    checkin: CheckinOut | None = None
+    escalated: bool  # True only when a real escalation row was created this turn
+
+
+class ChatCapabilities(BaseModel):
+    message_care_team: bool
+    call_care_team: bool
+    emergency_call_assist: bool
+    simulated: bool
 
 
 # ---- Reminders: medications & appointments ----------------------------------
@@ -134,7 +184,7 @@ class MedicationOut(ORM):
 
 class MedicationLogIn(BaseModel):
     scheduled_for: datetime  # the dose time being answered, e.g. today 08:00 local, as ISO
-    status: Literal["taken", "skipped"]
+    status: Literal["taken", "skipped", "pending"]  # pending = undo a taken/skipped answer
 
 
 class MedicationLogOut(ORM):

@@ -33,6 +33,18 @@ def log_symptoms(body: SymptomIn, db: Session = Depends(get_db), user: User = De
         raise HTTPException(403, "Patients only")
     patient = _patient_for(user, db, None)
 
+    log, risk, escalated = record_checkin(db, patient, body)
+    db.commit()
+    db.refresh(risk)
+    return SymptomResult(symptom_log_id=log.id, risk=RiskOut.model_validate(risk), escalated=escalated)
+
+
+def record_checkin(db: Session, patient: Patient, body: SymptomIn) -> tuple[SymptomLog, RiskScore, bool]:
+    """Saves one check-in, scores it, and opens a high_risk escalation if the score is high.
+
+    Shared by POST /symptoms and Foggy's chat check-in. Does not commit.
+    Returns (symptom log, risk score, escalated).
+    """
     log = SymptomLog(patient_id=patient.id, **body.model_dump())
     db.add(log)
     db.flush()  # gives log.id
@@ -58,10 +70,7 @@ def log_symptoms(body: SymptomIn, db: Session = Depends(get_db), user: User = De
             patient_id=patient.id, trigger_type="high_risk", severity="high", risk_score_id=risk.id,
             summary=f"Risk score {result['score']:.2f} at check-in. Top factors: {factors}.",
         ))
-
-    db.commit()
-    db.refresh(risk)
-    return SymptomResult(symptom_log_id=log.id, risk=RiskOut.model_validate(risk), escalated=escalated)
+    return log, risk, escalated
 
 
 @router.get("", response_model=list[SymptomOut])

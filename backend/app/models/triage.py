@@ -55,6 +55,7 @@ class ChatMessage(Base):
     citations: Mapped[list] = mapped_column(JsonList, default=list, nullable=False)
     answered_from_plan: Mapped[bool | None] = mapped_column(Boolean)  # False = not in care plan
     red_flag: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    route: Mapped[str | None] = mapped_column(Text)  # Foggy's route for assistant messages (database/chat_state.sql)
     created_at: Mapped[datetime] = created_at()
 
     patient: Mapped["Patient"] = relationship(back_populates="chat_messages")

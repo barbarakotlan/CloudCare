@@ -58,7 +58,10 @@ def log_dose(
     db: Session = Depends(get_db),
     patient: Patient = Depends(get_current_patient),
 ):
-    """Mark one scheduled dose as taken or skipped. Sending it again for the same time updates it."""
+    """Mark one scheduled dose as taken or skipped. Sending it again for the same time updates it.
+
+    status "pending" undoes an answer: the row stays, with no response time.
+    """
     med = db.get(Medication, medication_id)
     if med is None or med.patient_id != patient.id:
         raise HTTPException(404, "Medication not found")
@@ -73,7 +76,7 @@ def log_dose(
         log = MedicationLog(medication_id=med.id, scheduled_for=scheduled)
         db.add(log)
     log.status = body.status
-    log.responded_at = datetime.now(timezone.utc)
+    log.responded_at = None if body.status == "pending" else datetime.now(timezone.utc)
     db.commit()
     db.refresh(log)
     return log

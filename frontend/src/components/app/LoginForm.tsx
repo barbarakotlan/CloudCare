@@ -18,7 +18,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { errorMessage } from "@/lib/api/client";
-import { resetDemoOnSignIn, startsFreshDemo } from "@/lib/api/demo";
+import { noteDemoResetMissed, resetDemoOnSignIn, startsFreshDemo } from "@/lib/api/demo";
 import type { Role } from "@/lib/api/types";
 import { AUTH_PROVIDER_NAME, dashboardPathFor, login, logout, requestPasswordReset, signUpPatient } from "@/lib/auth";
 import { useSession } from "@/lib/auth/useSession";
@@ -187,9 +187,10 @@ export function LoginForm() {
     const s = await login(email, password, role);
     if (startsFreshDemo(s.user)) {
       // Each visitor to the shared demo patient starts from a clean Jordan Lee.
-      // Failures are ignored: the sign-in itself already worked.
+      // A failed or slow reset still signs in; the dashboard mentions it quietly.
       setPreparingDemo(true);
-      await resetDemoOnSignIn();
+      const reset = await resetDemoOnSignIn();
+      noteDemoResetMissed(!reset);
     }
     router.replace(dashboardPathFor(s.user.role));
   }
@@ -238,9 +239,11 @@ export function LoginForm() {
     ? submitting
       ? "Creating your account…"
       : "Create account"
-    : submitting
-      ? "Signing in…"
-      : "Sign in";
+    : preparingDemo
+      ? "Preparing a fresh demo…"
+      : submitting
+        ? "Signing in…"
+        : "Sign in";
 
   return (
     <div className="mt-8">
@@ -271,18 +274,28 @@ export function LoginForm() {
           </p>
         </div>
       ) : (
-        <SegmentedControl<Role>
-          label="I am signing in as"
-          value={role}
-          onChange={switchRole}
-          options={[
-            { value: "patient", label: "Patient", icon: <HeartPulse className="size-4" aria-hidden="true" /> },
-            { value: "clinician", label: "Doctor", icon: <Stethoscope className="size-4" aria-hidden="true" /> },
-          ]}
-        />
+        <fieldset disabled={submitting} className="contents">
+          <SegmentedControl<Role>
+            label="I am signing in as"
+            value={role}
+            onChange={switchRole}
+            options={[
+              { value: "patient", label: "Patient", icon: <HeartPulse className="size-4" aria-hidden="true" /> },
+              { value: "clinician", label: "Doctor", icon: <Stethoscope className="size-4" aria-hidden="true" /> },
+            ]}
+          />
+        </fieldset>
       )}
 
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4" noValidate aria-describedby={error ? errorId : undefined}>
+      <form
+        onSubmit={onSubmit}
+        className="mt-6 flex flex-col gap-4"
+        noValidate
+        aria-busy={submitting || undefined}
+        aria-describedby={error ? errorId : undefined}
+      >
+        {/* While signing in (and preparing the demo) every field is locked. */}
+        <fieldset disabled={submitting} className="contents">
         {signingUp ? (
           <Field label="Full name" htmlFor="login-name">
             <Input
@@ -442,9 +455,18 @@ export function LoginForm() {
           </p>
         ) : null}
 
-        <Button type="submit" size="lg" className="mt-2 w-full" disabled={submitDisabled}>
+        </fieldset>
+
+        {/* Not disabled while busy (that would grey it out); the submit handler ignores repeat presses. */}
+        <Button
+          type="submit"
+          size="lg"
+          className="mt-2 w-full"
+          disabled={submitDisabled && !submitting}
+          aria-disabled={submitting || undefined}
+        >
           {submitting ? (
-            <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />
+            <LoaderCircle className="size-5 animate-spin motion-reduce:hidden" aria-hidden="true" />
           ) : signingUp ? (
             <UserPlus className="size-5" aria-hidden="true" />
           ) : (
@@ -454,11 +476,17 @@ export function LoginForm() {
         </Button>
 
         {submitting && preparingDemo ? (
-          <p role="status" className="-mt-1 text-center text-sm text-ink-soft">
-            Preparing a fresh demo…
+          <p role="status" className="-mt-1 flex items-center justify-center gap-2 text-center text-sm text-ink-soft">
+            <span aria-hidden="true" className="inline-flex items-center gap-1 motion-reduce:hidden">
+              <span className="size-1.5 animate-typing rounded-full bg-brand-cyan" />
+              <span className="size-1.5 animate-typing rounded-full bg-brand-cyan [animation-delay:150ms]" />
+              <span className="size-1.5 animate-typing rounded-full bg-brand-cyan [animation-delay:300ms]" />
+            </span>
+            Clearing the shared demo patient so you start fresh
           </p>
         ) : null}
 
+        <fieldset disabled={submitting} className="contents">
         {!signingUp && role === "clinician" ? (
           <p className="text-center text-sm text-ink-soft">Care team accounts are created by your clinic.</p>
         ) : CAN_SIGN_UP ? (
@@ -486,6 +514,7 @@ export function LoginForm() {
             </a>
           </p>
         )}
+        </fieldset>
       </form>
 
       {signingUp ? null : (

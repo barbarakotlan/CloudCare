@@ -1,0 +1,85 @@
+/* Motion for the sales chat bubble (global classes, prefixed cc-sales-). Everything here is off under reduced motion. */
+
+.cc-sales-arrive {
+  animation: cc-sales-arrive 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* A slow ring that goes out once every 8 s, starting after the arrival bounce. */
+.cc-sales-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: cc-sales-pulse 8s ease-out 2.5s infinite;
+}
+
+.cc-sales-panel-in {
+  animation: cc-sales-panel-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.cc-sales-nudge-in {
+  animation: cc-sales-nudge-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: bottom right;
+}
+
+@keyframes cc-sales-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-7px) scale(1);
+  }
+  78% {
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cc-sales-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(25 154 192 / 0.42);
+  }
+  22% {
+    box-shadow: 0 0 0 16px rgb(25 154 192 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgb(25 154 192 / 0);
+  }
+}
+
+@keyframes cc-sales-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cc-sales-nudge-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-sales-arrive,
+  .cc-sales-pulse::after,
+  .cc-sales-panel-in,
+  .cc-sales-nudge-in {
+    animation: none;
+  }
+}

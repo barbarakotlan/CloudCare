@@ -7,6 +7,7 @@ import { HowItWorks } from "@/components/landing/HowItWorks";
 import { OurPromise } from "@/components/landing/Promise";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { SiteHeader } from "@/components/landing/SiteHeader";
+import { SalesBubble } from "@/components/sales/SalesBubble";
 
 export default function HomePage() {
   return (
@@ -21,6 +22,7 @@ export default function HomePage() {
         <ClosingCta />
       </main>
       <SiteFooter />
+      <SalesBubble />
     </DemoProvider>
   );
 }

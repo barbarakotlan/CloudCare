@@ -1,11 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Slogan } from "@/components/brand/Wordmark";
+import { ChatWithBarbaraLink } from "@/components/sales/ChatWithBarbaraLink";
 
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-surface-soft">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_1fr] md:items-end">
+      {/* Extra bottom room while the sales chat pill is showing (it sets --sales-bubble-space). */}
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 pt-12 pb-[calc(3rem+var(--sales-bubble-space,0px))] sm:px-6 md:grid-cols-[1.2fr_1fr] md:items-end">
         <div>
           <Image
             src="/brand/cloudcare-powered-by-jab.png"
@@ -46,6 +48,7 @@ export function SiteFooter() {
             <Link href="/login" className="hover:underline">
               Log in
             </Link>
+            <ChatWithBarbaraLink className="inline-flex min-h-10 cursor-pointer items-center hover:underline" />
           </nav>
         </div>
       </div>

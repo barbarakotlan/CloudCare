@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import { TeamGrid } from "@/components/landing/TeamGrid";
+import { SalesBubble } from "@/components/sales/SalesBubble";
 
 export const metadata: Metadata = {
   title: "The team",
@@ -29,6 +30,7 @@ export default function TeamPage() {
         </div>
       </main>
       <SiteFooter />
+      <SalesBubble />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, CounselNote, LegalPage, LegalSection, Placeholder, type TocEntry } from "@/components/legal/LegalPage";
+import { SalesBubble } from "@/components/sales/SalesBubble";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -29,6 +30,7 @@ const TOC: TocEntry[] = [
 
 export default function PrivacyPage() {
   return (
+    <>
     <LegalPage
       title="Privacy Policy"
       toc={TOC}
@@ -367,5 +369,7 @@ export default function PrivacyPage() {
         <p>For medical questions, contact your care team. In an emergency, call 911.</p>
       </LegalSection>
     </LegalPage>
+    <SalesBubble />
+    </>
   );
 }

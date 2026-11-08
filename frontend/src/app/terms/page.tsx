@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, CounselNote, LegalPage, LegalSection, Placeholder, type TocEntry } from "@/components/legal/LegalPage";
+import { SalesBubble } from "@/components/sales/SalesBubble";
 
 export const metadata: Metadata = {
   title: "Terms and Conditions",
@@ -33,6 +34,7 @@ const TOC: TocEntry[] = [
 
 export default function TermsPage() {
   return (
+    <>
     <LegalPage
       title="Terms and Conditions"
       toc={TOC}
@@ -485,5 +487,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
     </LegalPage>
+    <SalesBubble />
+    </>
   );
 }

@@ -110,6 +110,35 @@ export function formatMessageTime(value: string | Date, now: number | null = nul
 
 export const RISK_LABEL: Record<RiskLevel, string> = { low: "Low risk", medium: "Medium risk", high: "High risk" };
 
+/**
+ * A model score (0..1) as a percentage that never reads "0%": below 1% is "<1%",
+ * 1–10% keeps one decimal when there is one ("3.4%"), above that whole numbers.
+ */
+export function formatRiskPercent(score: number): string {
+  const pct = Math.min(100, score * 100);
+  if (!Number.isFinite(pct) || pct < 1) return "<1%";
+  if (pct < 10) {
+    const tenths = Math.round(pct * 10) / 10;
+    return Number.isInteger(tenths) ? `${tenths}%` : `${tenths.toFixed(1)}%`;
+  }
+  return `${Math.round(pct)}%`;
+}
+
+/**
+ * The model's top factors as relative weights that add up to about 100, biggest first.
+ * Only factors that pushed the estimate up are kept. Each weight is at least 1.
+ */
+export function relativeFactorWeights(
+  factors: { feature: string; impact: number }[],
+): { feature: string; weight: number }[] {
+  const up = factors.filter((f) => Number.isFinite(f.impact) && f.impact > 0);
+  const total = up.reduce((sum, f) => sum + f.impact, 0);
+  if (total <= 0) return [];
+  return up
+    .map((f) => ({ feature: f.feature, weight: Math.max(1, Math.round((f.impact / total) * 100)) }))
+    .sort((a, b) => b.weight - a.weight);
+}
+
 export const SEVERITY_LABEL: Record<Severity, string> = {
   emergency: "Emergency",
   high: "High",

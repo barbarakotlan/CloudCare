@@ -33,6 +33,9 @@ export function SiteFooter() {
             <Link href="/#our-promise" className="hover:underline">
               Our promise
             </Link>
+            <Link href="/team" className="hover:underline">
+              Team
+            </Link>
             <Link href="/terms" className="hover:underline">
               Terms
             </Link>

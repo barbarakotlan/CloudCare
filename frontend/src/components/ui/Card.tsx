@@ -1,10 +1,11 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-export function Card({ className, ...props }: ComponentProps<"section">) {
+/** `flush` drops the built-in padding (cn() concatenates, so a "p-0" className can't override it). */
+export function Card({ className, flush = false, ...props }: ComponentProps<"section"> & { flush?: boolean }) {
   return (
     <section
-      className={cn("rounded-[1.75rem] bg-white p-5 shadow-soft ring-1 ring-line/70 sm:p-6", className)}
+      className={cn("rounded-[1.75rem] bg-white shadow-soft ring-1 ring-line/70", !flush && "p-5 sm:p-6", className)}
       {...props}
     />
   );

@@ -3,6 +3,7 @@
 import { AlertOctagon, BellRing, HeartPulse, UsersRound } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ToastViewport, useToasts } from "@/components/ui/Toast";
 import { errorMessage } from "@/lib/api/client";
 import { listEscalations, updateEscalation } from "@/lib/api/escalations";
@@ -30,7 +31,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
   const now = useNow();
   const [filter, setFilter] = useState<QueueFilter>("active");
   const [escalations, setEscalations] = useState<EscalationOut[] | undefined>(undefined);
-  const [active, setActive] = useState<EscalationOut[]>([]);
+  const [active, setActive] = useState<EscalationOut[] | undefined>(undefined);
   const [patients, setPatients] = useState<PatientRow[] | undefined>(undefined);
   const [queueError, setQueueError] = useState<string | null>(null);
   const [patientsError, setPatientsError] = useState<string | null>(null);
@@ -115,11 +116,20 @@ export function ClinicianDashboard({ session }: { session: Session }) {
       setEscalations((list) =>
         (list ?? []).map((e) => (e.id === id ? updated : e)).filter((e) => e.id !== id || keep(updated)),
       );
-      setActive((list) => list.map((e) => (e.id === id ? updated : e)).filter((e) => e.status !== "resolved"));
+      setActive((list) => list?.map((e) => (e.id === id ? updated : e)).filter((e) => e.status !== "resolved"));
       setPatients((rows) =>
         rows?.map((r) =>
           r.id === updated.patient_id && status === "resolved"
-            ? { ...r, open_escalations: Math.max(0, r.open_escalations - 1) }
+            ? {
+                ...r,
+                open_escalations: Math.max(0, r.open_escalations - 1),
+                open_emergencies:
+                  r.open_emergencies !== undefined && updated.severity === "emergency"
+                    ? Math.max(0, r.open_emergencies - 1)
+                    : r.open_emergencies,
+                open_high:
+                  r.open_high !== undefined && updated.severity === "high" ? Math.max(0, r.open_high - 1) : r.open_high,
+              }
             : r,
         ),
       );
@@ -143,8 +153,10 @@ export function ClinicianDashboard({ session }: { session: Session }) {
     void refresh(new AbortController().signal);
   }
 
-  const emergencies = active.filter((e) => e.severity === "emergency").length;
-  const highRisk = (patients ?? []).filter((p) => p.latest_risk?.risk_level === "high").length;
+  // Real escalations a person still has to close, not model output.
+  const emergencies = active?.filter((e) => e.severity === "emergency").length;
+  // Model output from each patient's latest check-in.
+  const modelHigh = patients?.filter((p) => p.latest_risk?.risk_level === "high").length;
   const selectedRow = patients?.find((p) => p.id === selectedId);
 
   return (
@@ -161,10 +173,16 @@ export function ClinicianDashboard({ session }: { session: Session }) {
           </div>
 
           <dl className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat icon={<BellRing className="size-5" />} label="Active escalations" value={active.length} tone={active.length ? "cyan" : "plain"} />
-            <Stat icon={<AlertOctagon className="size-5" />} label="Emergencies" value={emergencies} tone={emergencies ? "red" : "plain"} />
-            <Stat icon={<UsersRound className="size-5" />} label="Patients" value={patients?.length ?? "–"} tone="plain" />
-            <Stat icon={<HeartPulse className="size-5" />} label="High risk now" value={highRisk} tone={highRisk ? "red" : "plain"} />
+            <Stat icon={<BellRing className="size-5" />} label="Active escalations" value={active?.length} tone={active?.length ? "cyan" : "plain"} />
+            <Stat icon={<AlertOctagon className="size-5" />} label="Open emergencies" value={emergencies} tone={emergencies ? "red" : "plain"} />
+            <Stat icon={<UsersRound className="size-5" />} label="Patients" value={patients?.length} tone="plain" />
+            <Stat
+              icon={<HeartPulse className="size-5" />}
+              label="Risk model: high"
+              hint="Model output from last check-ins"
+              value={modelHigh}
+              tone={modelHigh ? "amber" : "plain"}
+            />
           </dl>
 
           {/* grid-cols-1 (minmax(0,1fr)) matters: an implicit auto column grows to the widest
@@ -185,6 +203,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
             <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
               <PatientTable
                 rows={patients}
+                active={active}
                 loading={patients === undefined}
                 error={patientsError}
                 now={now}
@@ -198,7 +217,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
       <PatientDrawer
         patientId={selectedId}
         row={selectedRow}
-        escalations={active}
+        escalations={active ?? []}
         now={now}
         onClose={() => setSelectedId(null)}
         onProfileSaved={onProfileSaved}
@@ -211,33 +230,58 @@ export function ClinicianDashboard({ session }: { session: Session }) {
 function Stat({
   icon,
   label,
+  hint,
   value,
   tone,
 }: {
   icon: ReactNode;
   label: string;
-  value: number | string;
-  tone: "plain" | "cyan" | "red";
+  /** Small second line under the label (e.g. "model output"). */
+  hint?: string;
+  /** undefined while loading: shows a skeleton, never a flash of 0. */
+  value: number | undefined;
+  tone: "plain" | "cyan" | "red" | "amber";
 }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-[1.5rem] bg-white p-4 shadow-soft ring-1 sm:p-5",
-        tone === "red" ? "ring-brand-red/30" : "ring-line/70",
+        "flex min-w-0 items-center gap-3 rounded-[1.5rem] bg-white p-4 shadow-soft ring-1 sm:p-5",
+        tone === "red" ? "ring-brand-red/30" : tone === "amber" ? "ring-sev-medium/35" : "ring-line/70",
       )}
     >
       <span
         aria-hidden="true"
         className={cn(
-          "grid size-11 shrink-0 place-items-center rounded-2xl",
-          tone === "red" ? "bg-brand-red/10 text-brand-red" : "bg-surface-pale text-brand-cyan-strong",
+          "grid size-11 shrink-0 place-items-center rounded-2xl max-sm:hidden",
+          tone === "red"
+            ? "bg-brand-red/10 text-brand-red"
+            : tone === "amber"
+              ? "bg-sev-medium/14 text-[#7d5600]"
+              : "bg-surface-pale text-brand-cyan-strong",
         )}
       >
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="truncate text-xs font-bold text-brand-gray sm:text-sm">{label}</dt>
-        <dd className={cn("text-2xl font-black tabular-nums", tone === "red" ? "text-brand-red" : "text-ink")}>{value}</dd>
+        <dt className="text-xs leading-snug font-bold break-words text-brand-gray sm:text-sm">
+          {label}
+          {hint ? <span className="block text-[0.7rem] font-semibold text-brand-gray/85">{hint}</span> : null}
+        </dt>
+        <dd
+          className={cn(
+            "text-2xl font-black tabular-nums",
+            tone === "red" ? "text-brand-red" : tone === "amber" ? "text-[#7d5600]" : "text-ink",
+          )}
+        >
+          {value === undefined ? (
+            <>
+              <Skeleton className="mt-1 h-7 w-10" />
+              <span className="sr-only">Loading</span>
+            </>
+          ) : (
+            value
+          )}
+        </dd>
       </div>
     </div>
   );

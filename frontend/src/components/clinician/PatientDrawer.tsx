@@ -47,6 +47,7 @@ import { CarePlanUpload } from "./CarePlanUpload";
 import { TriggerLabel } from "./EscalationQueue";
 import { PatientProfileForm } from "./PatientProfileForm";
 import { RISK_TONE, SEVERITY_TONE, STATUS_LABEL } from "./severity";
+import { CurrentStatusChip, RiskModelSummary, riskTimeOf, urgencyOf } from "./urgency";
 
 type Tab = "overview" | "checkins" | "chat" | "plan" | "profile";
 
@@ -75,7 +76,18 @@ export function PatientDrawer({
       variant="drawer"
       title={row?.full_name ?? "Patient"}
       description={row && !pending ? row.procedure_name : undefined}
-      headerExtra={pending ? <FinishSetupBadge className="mt-1.5" /> : null}
+      headerExtra={
+        row ? (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {pending ? <FinishSetupBadge /> : null}
+            <CurrentStatusChip urgency={urgencyOf(row, escalations)} />
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span className="text-[0.7rem] font-extrabold tracking-wide text-brand-gray uppercase">Risk model</span>
+              <RiskModelSummary row={row} now={now} />
+            </span>
+          </div>
+        ) : null
+      }
       bodyClassName="bg-surface-soft"
     >
       {patientId ? (
@@ -252,7 +264,7 @@ function DrawerBody({
           <section aria-labelledby="ov-risk" className="rounded-3xl bg-white p-5 ring-1 ring-line/70">
             <h3 id="ov-risk" className="flex items-center gap-2 font-extrabold text-ink">
               <Activity className="size-4 text-brand-cyan-strong" aria-hidden="true" />
-              Latest risk
+              Risk model
             </h3>
             {row?.latest_risk ? (
               <div className="mt-3">
@@ -262,7 +274,7 @@ function DrawerBody({
                   </Badge>
                   <span className="text-sm text-brand-gray">
                     Score {Math.round(row.latest_risk.score * 100)}% · model {row.latest_risk.model_version}
-                    {now !== null ? ` · ${relativeTime(row.latest_risk.created_at, now)}` : ""}
+                    {riskTimeOf(row) && now !== null ? ` · from check-in ${relativeTime(riskTimeOf(row)!, now)}` : ""}
                   </span>
                 </div>
                 {row.latest_risk.top_factors.length ? (

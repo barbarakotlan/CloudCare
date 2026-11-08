@@ -1,77 +1,68 @@
 "use client";
 
 import { ChevronRight, UsersRound } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
+import type { ReactNode } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { PENDING_SETUP_PROCEDURE, type PatientRow } from "@/lib/api/types";
-import { cn } from "@/lib/cn";
-import { daysSince, relativeTime, RISK_LABEL } from "@/lib/format";
+import { PENDING_SETUP_PROCEDURE, type EscalationOut, type PatientRow } from "@/lib/api/types";
+import { daysSince, relativeTime } from "@/lib/format";
 import { FinishSetupBadge } from "./PatientDrawer";
-import { RISK_TONE } from "./severity";
+import { CurrentStatusChip, RiskModelSummary, sortWorklist, urgencyOf } from "./urgency";
 
 const needsSetup = (r: PatientRow) => r.procedure_name === PENDING_SETUP_PROCEDURE;
 
-function RiskCell({ row }: { row: PatientRow }) {
-  if (!row.latest_risk) return <Badge tone="gray">No check-ins</Badge>;
-  return (
-    <span className="inline-flex items-center gap-2">
-      <Badge tone={RISK_TONE[row.latest_risk.risk_level]} dot>
-        {RISK_LABEL[row.latest_risk.risk_level]}
-      </Badge>
-      <span className="text-xs font-bold text-brand-gray tabular-nums">{Math.round(row.latest_risk.score * 100)}%</span>
-    </span>
-  );
-}
-
-function OpenCount({ n }: { n: number }) {
-  return (
-    <span
-      className={cn(
-        "inline-grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm font-extrabold tabular-nums",
-        n > 0 ? "bg-brand-red text-white" : "bg-surface-pale text-brand-gray",
-      )}
-    >
-      <span className="sr-only">{n} open escalations</span>
-      <span aria-hidden="true">{n}</span>
-    </span>
-  );
-}
-
 export function PatientTable({
   rows,
+  active,
   loading,
   error,
   now,
   onOpen,
+  toolbar,
+  emptyFiltered = false,
+  riskInfo,
 }: {
   rows: PatientRow[] | undefined;
+  /** Active escalations, used to count open alerts when the server doesn't send counts. */
+  active: EscalationOut[] | undefined;
   loading: boolean;
   error: string | null;
   now: number | null;
   onOpen: (row: PatientRow) => void;
+  /** Search box and filters, rendered under the header. */
+  toolbar?: ReactNode;
+  /** Rows exist but the current search/filter hides all of them. */
+  emptyFiltered?: boolean;
+  /** Explainer shown next to the "Risk model" heading. */
+  riskInfo?: ReactNode;
 }) {
+  const sorted = rows ? sortWorklist(rows, active) : undefined;
   return (
     <Card aria-labelledby="patients-title" className="min-w-0">
       <CardHeader
         id="patients-title"
         icon={<UsersRound className="size-5" aria-hidden="true" />}
         title="My patients"
-        description="Highest recovery risk first"
+        description="Open emergencies first, then high alerts, then model risk"
       />
+      {toolbar}
       {error ? (
         <p role="alert" className="rounded-2xl bg-brand-red/8 px-4 py-3 text-sm font-semibold text-brand-red-dark">
           {error}
         </p>
       ) : null}
       {loading && !rows ? <Skeleton className="h-28" /> : null}
-      {rows && rows.length === 0 ? <p className="text-sm text-brand-gray">No patients are assigned to you yet.</p> : null}
+      {sorted && sorted.length === 0 ? (
+        <p className="text-sm text-brand-gray">
+          {emptyFiltered ? "No patients match this search." : "No patients are assigned to you yet."}
+        </p>
+      ) : null}
 
-      {rows && rows.length > 0 ? (
+      {sorted && sorted.length > 0 ? (
         <>
           {/* Mobile: cards */}
           <ul className="flex flex-col gap-2 md:hidden">
-            {rows.map((r) => (
+            {sorted.map((r) => (
               <li key={r.id}>
                 <button
                   type="button"
@@ -84,71 +75,81 @@ export function PatientTable({
                       {needsSetup(r) ? <FinishSetupBadge /> : null}
                     </p>
                     {needsSetup(r) ? null : (
-                      <p className="truncate text-sm text-brand-gray">
+                      <p className="text-sm break-words text-brand-gray">
                         {r.procedure_name}
                         {now !== null ? ` · day ${daysSince(r.surgery_date, now)}` : ""}
                       </p>
                     )}
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <RiskCell row={r} />
+                    <div className="mt-2 flex flex-col items-start gap-1.5">
+                      <CurrentStatusChip urgency={urgencyOf(r, active)} />
+                      <span className="text-[0.7rem] font-extrabold tracking-wide text-brand-gray uppercase">
+                        Risk model
+                      </span>
+                      <RiskModelSummary row={r} now={now} className="-mt-1" />
                     </div>
                   </div>
-                  <OpenCount n={r.open_escalations} />
-                  <ChevronRight className="size-5 text-brand-gray" aria-hidden="true" />
+                  <ChevronRight className="size-5 shrink-0 text-brand-gray" aria-hidden="true" />
                 </button>
               </li>
             ))}
           </ul>
 
-          {/* Desktop: table */}
+          {/* Tablet and desktop: table (scrolls inside the card if it ever has to) */}
           <div className="-mx-2 hidden overflow-x-auto md:block">
             <table className="w-full border-separate border-spacing-y-1 text-left">
               <thead>
                 <tr className="text-xs font-extrabold tracking-wide whitespace-nowrap text-brand-gray uppercase">
-                  <th scope="col" className="px-3 py-2">Patient</th>
-                  <th scope="col" className="px-3 py-2">Latest risk</th>
-                  <th scope="col" className="px-3 py-2 text-center">Open</th>
-                  <th scope="col" className="px-3 py-2">Last check-in</th>
-                  <th scope="col" className="px-3 py-2">
-                    <span className="sr-only">Actions</span>
+                  <th scope="col" className="px-2 py-2">Patient</th>
+                  <th scope="col" className="px-2 py-2">Current status</th>
+                  <th scope="col" className="px-2 py-2">
+                    <span className="inline-flex items-center gap-1">
+                      Risk model
+                      {riskInfo}
+                    </span>
+                  </th>
+                  <th scope="col" className="px-2 py-2">Last check-in</th>
+                  <th scope="col" className="w-8 px-1 py-2">
+                    <span className="sr-only">Open</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="group">
-                    <td className="rounded-l-2xl bg-surface-soft px-3 py-3 group-hover:bg-surface-pale">
-                      <p className="flex items-center gap-2 font-extrabold whitespace-nowrap text-ink">
-                        {r.full_name}
+                {sorted.map((r) => (
+                  <tr key={r.id} className="group cursor-pointer" onClick={() => onOpen(r)}>
+                    <td className="rounded-l-2xl bg-surface-soft py-3 pr-2 pl-3 align-top group-hover:bg-surface-pale">
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen(r);
+                          }}
+                          className="rounded-md text-left font-extrabold text-ink underline-offset-4 hover:text-brand-cyan-strong hover:underline"
+                        >
+                          {r.full_name}
+                        </button>
                         {needsSetup(r) ? <FinishSetupBadge /> : null}
                       </p>
                       {needsSetup(r) ? (
                         <p className="text-sm text-brand-gray">Add procedure and dates</p>
                       ) : (
-                        <p className="max-w-[13rem] truncate text-sm text-brand-gray" title={r.procedure_name}>
+                        <p className="line-clamp-2 max-w-[17rem] min-w-[12rem] text-sm text-brand-gray" title={r.procedure_name}>
                           {now !== null ? `Day ${daysSince(r.surgery_date, now)} · ` : ""}
                           {r.procedure_name}
                         </p>
                       )}
                     </td>
-                    <td className="bg-surface-soft px-3 py-3 whitespace-nowrap group-hover:bg-surface-pale">
-                      <RiskCell row={r} />
+                    <td className="bg-surface-soft px-2 py-3 align-top whitespace-nowrap group-hover:bg-surface-pale">
+                      <CurrentStatusChip urgency={urgencyOf(r, active)} />
                     </td>
-                    <td className="bg-surface-soft px-3 py-3 text-center group-hover:bg-surface-pale">
-                      <OpenCount n={r.open_escalations} />
+                    <td className="bg-surface-soft px-2 py-3 align-top group-hover:bg-surface-pale">
+                      <RiskModelSummary row={r} now={now} stacked />
                     </td>
-                    <td className="bg-surface-soft px-3 py-3 text-sm whitespace-nowrap text-ink-soft group-hover:bg-surface-pale">
+                    <td className="bg-surface-soft px-2 py-3 align-top text-sm whitespace-nowrap text-ink-soft group-hover:bg-surface-pale">
                       {r.last_checkin_at ? (now !== null ? relativeTime(r.last_checkin_at, now) : "…") : "Never"}
                     </td>
-                    <td className="rounded-r-2xl bg-surface-soft px-3 py-3 text-right group-hover:bg-surface-pale">
-                      <button
-                        type="button"
-                        onClick={() => onOpen(r)}
-                        className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-bold whitespace-nowrap text-brand-cyan-strong ring-1 ring-line transition-colors hover:ring-brand-cyan"
-                      >
-                        Open <span className="sr-only">{r.full_name}</span>
-                        <ChevronRight className="size-4" aria-hidden="true" />
-                      </button>
+                    <td className="rounded-r-2xl bg-surface-soft px-1 py-3 pr-3 align-top text-right group-hover:bg-surface-pale">
+                      <ChevronRight className="mt-0.5 size-5 text-brand-gray group-hover:text-brand-cyan-strong" aria-hidden="true" />
                     </td>
                   </tr>
                 ))}

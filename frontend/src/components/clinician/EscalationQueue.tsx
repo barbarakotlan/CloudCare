@@ -39,7 +39,7 @@ export function EscalationQueue({
   lastUpdated: number | null;
 }) {
   return (
-    <Card aria-labelledby="queue-title" className="min-w-0 p-0 sm:p-0">
+    <Card aria-labelledby="queue-title" flush className="min-w-0">
       <div className="p-5 pb-0 sm:p-6 sm:pb-0">
         <CardHeader
           id="queue-title"

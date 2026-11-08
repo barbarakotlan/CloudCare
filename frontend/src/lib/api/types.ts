@@ -30,6 +30,13 @@ export type PatientRow = {
   latest_risk: RiskOut | null;
   open_escalations: number;
   last_checkin_at: string | null;
+  /** Open (not resolved) escalations with severity "emergency". Older servers omit it. */
+  open_emergencies?: number;
+  /** Open (not resolved) escalations with severity "high". Older servers omit it. */
+  open_high?: number;
+  /** When the latest risk score was computed (the check-in it came from). */
+  latest_risk_at?: string | null;
+  last_alert_at?: string | null;
 };
 
 export type PatientOut = {
@@ -180,6 +187,9 @@ export type EscalationOut = {
   clinician_notes: string | null;
   created_at: string;
   resolved_at: string | null;
+  /** Who last acknowledged or resolved it. Older servers omit it. */
+  reviewed_by_name?: string | null;
+  acknowledged_at?: string | null;
 };
 
 export type EscalationUpdate = { status: EscalationStatus; clinician_notes?: string | null };

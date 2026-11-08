@@ -1,6 +1,6 @@
 "use client";
 
-import { Hospital, Info, LoaderCircle, RefreshCw, ShieldCheck, Unlink } from "lucide-react";
+import { Check, Copy, Hospital, Info, LoaderCircle, RefreshCw, ShieldCheck, Unlink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -296,11 +296,7 @@ export function MyChartCard({ notify, now }: { notify: Notify; now: number | nul
             ) : null}
           </div>
 
-          {epic.sandbox ? (
-            <p className="mt-3 text-xs text-brand-gray">
-              Uses Epic&rsquo;s sandbox. Sign in with an Epic test patient, not your real MyChart account.
-            </p>
-          ) : null}
+          {epic.sandbox ? <SandboxLogin /> : null}
         </div>
       ) : null}
 
@@ -356,5 +352,89 @@ export function MyChartCard({ notify, now }: { notify: Notify; now: number | nul
         </div>
       ) : null}
     </Card>
+  );
+}
+
+/** Epic's public sandbox test patient (from Epic's developer docs; not a real person). */
+const SANDBOX_LOGIN = [
+  { label: "Username", value: "fhircamila" },
+  { label: "Password", value: "epicepic1" },
+] as const;
+
+/** Shown under Connect while the API points at Epic's sandbox. */
+function SandboxLogin() {
+  return (
+    <div className="mt-4 rounded-2xl bg-surface-soft p-4 ring-1 ring-line/70">
+      <p className="text-sm font-extrabold text-ink">Demo MyChart login</p>
+      <p className="mt-0.5 text-sm text-ink-soft">Epic test patient</p>
+      <dl className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
+        {SANDBOX_LOGIN.map((item) => (
+          <div key={item.label} className="flex min-w-0 items-center gap-2 rounded-xl bg-white py-1 pr-1 pl-3 ring-1 ring-line">
+            <dt className="text-xs font-bold text-brand-gray">{item.label}</dt>
+            <dd id={`epic-demo-${item.label.toLowerCase()}`} className="min-w-0 flex-1 font-mono text-sm font-bold break-all text-ink select-all">
+              {item.value}
+            </dd>
+            <CopyButton value={item.value} label={item.label.toLowerCase()} targetId={`epic-demo-${item.label.toLowerCase()}`} />
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs leading-relaxed text-brand-gray">
+        Use this on Epic&rsquo;s login page; it is public test data, not a real person.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Clipboard API first; where it's blocked (some embedded browsers), select the text on
+ * screen and try the legacy copy command, so at worst the value is selected for Ctrl/Cmd+C.
+ */
+function copyBySelecting(targetId: string): boolean {
+  const node = document.getElementById(targetId);
+  const selection = window.getSelection();
+  if (!node || !selection) return false;
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  }
+}
+
+function CopyButton({ value, label, targetId }: { value: string; label: string; targetId: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+    } catch {
+      setState(copyBySelecting(targetId) ? "copied" : "failed");
+    }
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), 1800);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      aria-label={`Copy ${label}`}
+      className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-brand-cyan-strong transition-colors hover:bg-surface-pale focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan"
+    >
+      {state === "copied" ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
+      <span aria-live="polite">{state === "copied" ? "Copied" : state === "failed" ? "Selected" : "Copy"}</span>
+    </button>
   );
 }

@@ -67,3 +67,8 @@ We are looking for **pilot hospitals**: a surgical or anesthesia team willing to
 ## Pricing
 
 We don't publish a price. **Pricing depends on discharge volume and integration scope, so a person on our team walks you through it.**
+
+## How to reach us
+
+- **Hospitals, pilots and onboarding:** onboarding@cloudcare.icu, or leave your details in this chat and a person on our team follows up.
+- **Help with an account, privacy or legal questions:** support@cloudcare.icu.

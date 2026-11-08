@@ -4,7 +4,7 @@
                      brief, through the language model when available, else keyword rules.
                      Never 500s: any model problem falls back to rules.
 - POST /sales/leads  public. Stores an onboarding request and the rendered email to the
-                     sales inbox (status 'stored'; nothing is sent).
+                     team inbox; sends it only when RESEND_API_KEY is set (see emailer).
 - GET  /sales/leads  clinicians only. Stored requests, newest first.
 
 Logs carry event names and counts only, never what visitors typed.
@@ -259,9 +259,11 @@ def _lead_from(body: SalesLeadIn) -> SalesLead:
     )
 
 
-def _created(lead: SalesLead, email: emailer.RenderedEmail) -> dict:
+def _created(lead: SalesLead, email: emailer.RenderedEmail, delivery: str) -> dict:
     return SalesLeadCreated(
-        id=lead.id, status="stored", email={"to": email.to, "subject": email.subject, "body": email.body}
+        id=lead.id,
+        status="stored",
+        email={"to": email.to, "subject": email.subject, "body": email.body, "delivery": delivery},
     ).model_dump(mode="json")
 
 
@@ -276,14 +278,17 @@ def create_lead(body: SalesLeadIn, db: Session = Depends(get_db)):
     if body.website:
         # Honeypot filled in: look the same to the sender, store nothing.
         log.info("sales.lead.honeypot")
-        return JSONResponse(_created(lead, emailer.render(lead)), status_code=status.HTTP_200_OK)
+        looks_like = "sent" if emailer.sending_enabled() else "stored"
+        return JSONResponse(_created(lead, emailer.render(lead), looks_like), status_code=status.HTTP_200_OK)
 
     db.add(lead)
     db.flush()
-    _, email = emailer.store(db, lead)
+    row, email = emailer.store(db, lead)
     db.commit()
     log.info("sales.lead.stored transcript_turns=%d", len(lead.transcript or []))
-    return _created(lead, email)
+    # Sent only after the request is safely stored; a delivery problem never fails it.
+    delivery = emailer.deliver(db, row, email, reply_to=lead.work_email)
+    return _created(lead, email, delivery)
 
 
 @router.get("/leads", response_model=list[SalesLeadOut])

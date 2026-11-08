@@ -18,6 +18,8 @@ PRICING_RULE = (
     "walks you through it."
 )
 ONBOARD_INVITE = "Want me to get your hospital set up? It takes two minutes."
+ONBOARDING_EMAIL = "onboarding@cloudcare.icu"
+SUPPORT_EMAIL = "support@cloudcare.icu"
 
 FALLBACK_BRIEF = f"""CloudCare is an early-stage post-operative recovery companion for hospital surgical and
 anesthesia teams. Patients go home with a recovery plan written by their clinician and a
@@ -34,7 +36,9 @@ under HIPAA yet and no BAAs with vendors, the text assistant uses Gemini's free 
 texts are US-only, and the alert queue is not watched around the clock.
 Team: three co-founders, Barbara Kotlan (backend and data), Jacob Foti (business lead) and
 Anna Kotlan (AI and ML). We are looking for pilot hospitals.
-Pricing: we don't publish a price. {PRICING_RULE}"""
+Pricing: we don't publish a price. {PRICING_RULE}
+How to reach us: hospitals and pilots email {ONBOARDING_EMAIL} (or leave details in the chat);
+help with an account, privacy or legal questions go to {SUPPORT_EMAIL}."""
 
 
 def load_brief(path: Path = BRIEF_PATH) -> tuple[str, bool]:
@@ -76,6 +80,10 @@ Rules:
   CloudCare helps care teams.
 - Never ask for or accept patient information (names, conditions, records). The only details
   you collect are the work contact details in the onboarding form.
+- If someone wants to talk to a person, asks how to contact the team, or wants an email
+  address: say they can email {ONBOARDING_EMAIL} or leave their details here. For help with
+  an existing account, privacy or legal questions, point to {SUPPORT_EMAIL}. Never make up
+  other email addresses or phone numbers.
 - Sell toward a pilot: end most replies with a gentle next step (a question, the demo at
   cloudcare.icu, or getting their hospital set up).
 - Set "cta" to "onboard" when the visitor shows buying intent: asks about a pilot, pricing,

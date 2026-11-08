@@ -100,8 +100,16 @@ services:
       # Link put in texts.
       - key: PUBLIC_APP_URL
         value: https://cloudcare.icu
-      # Inbox named on the onboarding-request emails the sales chat stores
-      # (never sent by the API). Empty uses sales@cloudcare.icu. Apply
-      # backend/sales.sql first.
+      # Inbox for the onboarding-request emails from the sales chat. Empty uses
+      # support@cloudcare.icu (forwards to the whole team). Apply
+      # backend/sales.sql first (it also adds the delivery columns).
       - key: SALES_LEAD_TO
+        sync: false
+      # Resend API key. Set: each stored onboarding request is also emailed to
+      # SALES_LEAD_TO and the row is marked sent/failed. Empty: stored only.
+      - key: RESEND_API_KEY
+        sync: false
+      # Sender for those emails (a domain verified in Resend). Empty uses
+      # "CloudCare <no-reply@cloudcare.icu>".
+      - key: SALES_EMAIL_FROM
         sync: false

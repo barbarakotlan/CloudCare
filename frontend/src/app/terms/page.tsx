@@ -149,7 +149,7 @@ export default function TermsPage() {
           <li>Use your account only for yourself, and sign out when you use a shared or public device.</li>
           <li>
             Tell us right away if you think someone used your account without your permission. Contact us at{" "}
-            <Placeholder>CloudCare contact email</Placeholder>.
+            <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>.
           </li>
         </ul>
       </LegalSection>
@@ -457,7 +457,7 @@ export default function TermsPage() {
         <p>If you have questions about these Terms or about your data, contact us:</p>
         <ul>
           <li>
-            <strong>Email:</strong> <Placeholder>CloudCare contact email</Placeholder>
+            <strong>Email:</strong> <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
           </li>
           <li>
             <strong>Mail:</strong> <Placeholder>Mailing address, if applicable</Placeholder>

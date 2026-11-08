@@ -50,7 +50,7 @@ export type SalesLeadIn = {
 export type SalesLeadOut = {
   id: string;
   status: "stored";
-  email?: { to: string; subject: string; body: string };
+  email?: { to: string; subject: string; body: string; delivery?: "sent" | "stored" | "failed" };
 };
 
 export const SALES_HISTORY_LIMIT = 12;

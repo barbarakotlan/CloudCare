@@ -92,6 +92,13 @@ export default function PrivacyPage() {
           <strong>MyChart records.</strong> Only if you connect MyChart. See section 6.
         </p>
         <p>
+          <strong>Website chat.</strong> The chat on our public pages is answered by an automated assistant. We store
+          what you type there and, if you ask about a pilot, the onboarding details you give (hospital, name, role, work
+          email, phone, volumes, and notes) together with the chat transcript, so our team can follow up. Please do not
+          share patient information in this chat. To have it deleted, email{" "}
+          <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>.
+        </p>
+        <p>
           <strong>Technical information.</strong> Our servers keep basic logs, such as which feature was used, when, and
           whether it worked (status codes). These logs do not contain the text of your messages, your care plan, or
           your MyChart records. Our hosting providers may also keep standard logs, such as IP addresses and request
@@ -220,8 +227,12 @@ export default function PrivacyPage() {
             <strong>Vercel</strong>: hosts the CloudCare website.
           </li>
           <li>
-            <strong>Google (Gemini)</strong>: writes Foggy&rsquo;s text replies, as described in section 4, and runs
-            voice conversations through ElevenLabs, as described in section 5.
+            <strong>Google (Gemini)</strong>: writes Foggy&rsquo;s text replies, as described in section 4, runs
+            voice conversations through ElevenLabs, as described in section 5, and writes the website chat&rsquo;s
+            replies.
+          </li>
+          <li>
+            <strong>Resend</strong>: delivers pilot requests from the website chat to our team&rsquo;s inbox.
           </li>
           <li>
             <strong>ElevenLabs</strong>: voice conversations and phone calls, as described in section 5.
@@ -335,7 +346,7 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Depending on where you live, you may have other privacy rights under state law. To make a request, contact
-          us at <Placeholder>CloudCare contact email</Placeholder>. We may need to confirm it is really you before we
+          us at <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>. We may need to confirm it is really you before we
           act, and we will not treat you differently for making a request.
         </p>
       </LegalSection>
@@ -360,7 +371,7 @@ export default function PrivacyPage() {
         <p>For questions about this policy or your information:</p>
         <ul>
           <li>
-            <strong>Email:</strong> <Placeholder>CloudCare contact email</Placeholder>
+            <strong>Email:</strong> <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
           </li>
           <li>
             <strong>Mail:</strong> <Placeholder>Mailing address</Placeholder>

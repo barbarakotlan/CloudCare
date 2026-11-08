@@ -17,6 +17,15 @@ export default function ResetPasswordPage() {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
         <h1 className="text-3xl font-black tracking-tight text-ink sm:text-4xl">Choose a new password</h1>
         <ResetPasswordForm />
+        <p className="mt-6 text-sm text-ink-soft">
+          Trouble signing in?{" "}
+          <a
+            href="mailto:support@cloudcare.icu"
+            className="font-bold text-brand-cyan-strong underline decoration-brand-cyan/40 underline-offset-2 hover:decoration-brand-cyan-strong"
+          >
+            support@cloudcare.icu
+          </a>
+        </p>
       </div>
     </main>
   );

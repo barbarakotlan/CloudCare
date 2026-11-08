@@ -1,7 +1,8 @@
 """Sales chat and onboarding requests (/sales).
 
 In-memory SQLite; the language model is either off (LLM_PROVIDER=none) or faked with
-httpx.MockTransport, so nothing leaves the machine. Nothing in /sales sends email.
+httpx.MockTransport, and the email provider is faked the same way (emailer.set_transport),
+so nothing leaves the machine.
 
 Run from the repo root with either:
     .venv\\Scripts\\python.exe backend\\tests\\test_sales.py
@@ -63,7 +64,9 @@ def _model_says(payload: dict, calls: list | None = None):
 
 def _setup():
     _llm_off()
-    os.environ.pop("SALES_LEAD_TO", None)
+    for key in ("SALES_LEAD_TO", "RESEND_API_KEY", "SALES_EMAIL_FROM"):
+        os.environ.pop(key, None)
+    emailer.set_transport(None)
     for key in ("RENDER", "ENV", "APP_ENV", "ENVIRONMENT"):
         os.environ.pop(key, None)
     auth.JWT_SECRET = STRONG_SECRET
@@ -211,6 +214,8 @@ def test_rules_cover_at_least_12_topics():
         "Which language model, Gemini?": "llm",
         "Are you a real person?": "identity",
         "hello there": "greeting",
+        "How can I contact your team?": "contact",
+        "Can I talk to a human?": "contact",
     }
     for message, topic in expected.items():
         got = rules.match_topic(message)
@@ -375,15 +380,19 @@ def test_lead_stored_with_rendered_email_not_sent():
     smtplib.SMTP = smtplib.SMTP_SSL = _NoSend
     calls: list = []
     ai_service._HTTP_TRANSPORT = httpx.MockTransport(lambda r: calls.append(r) or httpx.Response(500))
+    # No RESEND_API_KEY: the email provider must not be called either.
+    emailer.set_transport(httpx.MockTransport(lambda r: calls.append(r) or httpx.Response(500)))
     try:
         res = client.post("/sales/leads", json=_lead())
     finally:
         smtplib.SMTP, smtplib.SMTP_SSL = real_smtp, real_ssl
+        emailer.set_transport(None)
         _llm_off()
     assert res.status_code == 201, res.text
     data = res.json()
     assert data["status"] == "stored"
-    assert data["email"]["to"] == "sales@cloudcare.icu"
+    assert data["email"]["delivery"] == "stored"
+    assert data["email"]["to"] == "support@cloudcare.icu"
     assert data["email"]["subject"] == "CloudCare pilot request — Mercy General"
     body = data["email"]["body"]
     for value in ("Sam Rivera", "sam.rivera@mercy.example.org", "400-600", "Epic", "Next quarter",
@@ -397,9 +406,85 @@ def test_lead_stored_with_rendered_email_not_sent():
         emails = db.scalars(select(SalesEmail)).all()
         assert len(emails) == 1
         assert emails[0].status == "stored" and emails[0].lead_id == lead.id
+        assert emails[0].provider_id is None and emails[0].error is None
         assert emails[0].body == body
     source = Path(emailer.__file__).read_text(encoding="utf-8")
-    assert "smtplib" not in source and "httpx" not in source
+    assert "smtplib" not in source
+
+
+def _resend(handler, calls: list):
+    def wrapped(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return handler(request)
+    emailer.set_transport(httpx.MockTransport(wrapped))
+
+
+def test_lead_email_sent_when_resend_key_set():
+    client, Session, _ = _setup()
+    calls: list = []
+    os.environ["RESEND_API_KEY"] = "re_test_key"
+    _resend(lambda r: httpx.Response(200, json={"id": "msg_123"}), calls)
+    try:
+        res = client.post("/sales/leads", json=_lead())
+    finally:
+        os.environ.pop("RESEND_API_KEY", None)
+        emailer.set_transport(None)
+    assert res.status_code == 201, res.text
+    data = res.json()
+    assert data["status"] == "stored" and data["email"]["delivery"] == "sent"
+    assert "Reply to this email" in data["email"]["body"]
+    assert len(calls) == 1
+    req = calls[0]
+    assert str(req.url) == emailer.RESEND_URL and req.method == "POST"
+    assert req.headers["authorization"] == "Bearer re_test_key"
+    sent = json.loads(req.content)
+    assert sent["from"] == "CloudCare <no-reply@cloudcare.icu>"
+    assert sent["to"] == ["support@cloudcare.icu"]
+    assert sent["subject"] == "CloudCare pilot request — Mercy General"
+    assert sent["reply_to"] == "sam.rivera@mercy.example.org"
+    assert "Sam Rivera" in sent["text"]
+    with Session() as db:
+        row = db.scalars(select(SalesEmail)).one()
+        assert row.status == "sent" and row.provider_id == "msg_123" and row.error is None
+
+
+def test_lead_email_provider_error_recorded_as_failed():
+    client, Session, _ = _setup()
+    calls: list = []
+    os.environ["RESEND_API_KEY"] = "re_test_key"
+    os.environ["SALES_EMAIL_FROM"] = "Team <team@example.org>"
+    _resend(lambda r: httpx.Response(422, json={"name": "validation_error", "message": "Invalid from field"}), calls)
+    try:
+        res = client.post("/sales/leads", json=_lead())
+    finally:
+        os.environ.pop("RESEND_API_KEY", None)
+        os.environ.pop("SALES_EMAIL_FROM", None)
+        emailer.set_transport(None)
+    assert res.status_code == 201, res.text
+    assert res.json()["status"] == "stored" and res.json()["email"]["delivery"] == "failed"
+    assert json.loads(calls[0].content)["from"] == "Team <team@example.org>"
+    with Session() as db:
+        assert db.scalar(select(func.count()).select_from(SalesLead)) == 1
+        row = db.scalars(select(SalesEmail)).one()
+        assert row.status == "failed" and row.provider_id is None
+        assert row.error == "http 422: Invalid from field"
+
+    # A network error is a failure too, never a 500.
+    client, Session, _ = _setup()
+    os.environ["RESEND_API_KEY"] = "re_test_key"
+
+    def down(request):
+        raise httpx.ConnectTimeout("slow")
+    _resend(down, [])
+    try:
+        res = client.post("/sales/leads", json=_lead())
+    finally:
+        os.environ.pop("RESEND_API_KEY", None)
+        emailer.set_transport(None)
+    assert res.status_code == 201 and res.json()["email"]["delivery"] == "failed"
+    with Session() as db:
+        row = db.scalars(select(SalesEmail)).one()
+        assert row.status == "failed" and row.error == "ConnectTimeout"
 
 
 def test_lead_email_goes_to_configured_inbox():
@@ -417,9 +502,17 @@ def test_lead_email_goes_to_configured_inbox():
 
 def test_honeypot_stores_nothing():
     client, Session, _ = _setup()
-    res = client.post("/sales/leads", json=_lead(website="http://spam.example"))
+    calls: list = []
+    os.environ["RESEND_API_KEY"] = "re_test_key"
+    _resend(lambda r: httpx.Response(200, json={"id": "x"}), calls)
+    try:
+        res = client.post("/sales/leads", json=_lead(website="http://spam.example"))
+    finally:
+        os.environ.pop("RESEND_API_KEY", None)
+        emailer.set_transport(None)
     assert res.status_code == 200
     assert res.json()["status"] == "stored"
+    assert not calls
     with Session() as db:
         assert db.scalar(select(func.count()).select_from(SalesLead)) == 0
         assert db.scalar(select(func.count()).select_from(SalesEmail)) == 0

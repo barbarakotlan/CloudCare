@@ -61,6 +61,15 @@ export function Audiences() {
               Open the clinician demo
               <ArrowRight className="size-4" aria-hidden="true" />
             </ButtonLink>
+            <p className="mt-4 text-sm text-ink-soft">
+              Bringing CloudCare to your hospital? Email{" "}
+              <a
+                href="mailto:onboarding@cloudcare.icu"
+                className="font-bold whitespace-nowrap text-brand-cyan-strong underline underline-offset-2"
+              >
+                onboarding@cloudcare.icu
+              </a>
+            </p>
           </article>
         </div>
       </div>

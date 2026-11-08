@@ -7,8 +7,9 @@
 --
 -- sales_leads holds the work contact details a hospital visitor typed into
 -- the chat's onboarding form, plus the chat transcript (at most 40 turns).
--- sales_emails holds the email to the sales inbox, rendered by the API and
--- stored with status 'stored'. Nothing sends it. No patient data here.
+-- sales_emails holds the email to the team inbox, rendered by the API and
+-- stored with status 'stored'. When RESEND_API_KEY is set the API also sends
+-- it and records 'sent' (provider_id) or 'failed' (error). No patient data here.
 -- Models: backend/app/models/sales.py.
 -- =====================================================================
 
@@ -44,6 +45,9 @@ create table if not exists sales_emails (
 );
 create index if not exists ix_sales_emails_created_at on sales_emails(created_at);
 create index if not exists ix_sales_emails_lead_id on sales_emails(lead_id);
+-- Delivery outcome (added after the first release; safe on an existing table).
+alter table sales_emails add column if not exists provider_id text;
+alter table sales_emails add column if not exists error text;
 
 -- Same lockdown as database/supabase_rls.sql: only the API (postgres role) touches them.
 alter table public.sales_leads enable row level security;

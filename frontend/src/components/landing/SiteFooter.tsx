@@ -50,6 +50,17 @@ export function SiteFooter() {
             </Link>
             <ChatWithBarbaraLink className="inline-flex min-h-10 cursor-pointer items-center hover:underline" />
           </nav>
+          <p className="flex flex-wrap gap-x-2 gap-y-1 text-sm leading-relaxed text-ink-soft md:justify-end [&_a]:font-bold [&_a]:text-brand-cyan-strong [&_a:hover]:underline">
+            <span>
+              Hospitals: <a href="mailto:onboarding@cloudcare.icu">onboarding@cloudcare.icu</a>
+            </span>
+            <span aria-hidden="true" className="hidden text-brand-gray sm:inline">
+              ·
+            </span>
+            <span>
+              Help: <a href="mailto:support@cloudcare.icu">support@cloudcare.icu</a>
+            </span>
+          </p>
         </div>
       </div>
     </footer>

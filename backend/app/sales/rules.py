@@ -8,7 +8,7 @@ as Barbara's AI twin, at most three sentences, no price, no medical advice, hone
 import re
 from dataclasses import dataclass, field
 
-from app.sales.prompt import PRICING_RULE
+from app.sales.prompt import ONBOARDING_EMAIL, PRICING_RULE, SUPPORT_EMAIL
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,8 @@ TOPICS: tuple[Topic, ...] = (
         "pricing",
         _rx(r"\bpric(e|es|ed|ing)\b", r"\bcosts?\b", r"\bhow much\b", r"\bfees?\b", r"\bbudget\b",
             r"\bquote\b", r"\bexpensive\b", r"\bsubscription\b", r"\blicen[cs](e|ing)\b", r"\bpay\b"),
-        f"We don't publish a price: {PRICING_RULE[0].lower()}{PRICING_RULE[1:]}",
+        f"We don't publish a price: {PRICING_RULE[0].lower()}{PRICING_RULE[1:-1]}, "
+        f"and you can also email {ONBOARDING_EMAIL}.",
         ("What does a pilot look like?", "Does it work with Epic?"),
     ),
     Topic(
@@ -57,8 +58,17 @@ TOPICS: tuple[Topic, ...] = (
             r"\btrial\b", r"\broll ?out\b", r"\bimplement\w*\b", r"\bset (?:it |this |us )?up\b",
             r"\bnext steps?\b", r"\bdeploy\w*\b"),
         "We're looking for pilot hospitals, and a person on our team scopes each pilot with you, including which "
-        "patients take part and who reviews alerts.",
+        f"patients take part and who reviews alerts (you can also email {ONBOARDING_EMAIL}).",
         ("What does it cost?", "Is it HIPAA compliant?"),
+    ),
+    Topic(
+        "contact",
+        _rx(r"\bcontact\b", r"\be-?mail\b", r"\breach (you|someone|the team|your team)\b",
+            r"\b(talk|speak) (to|with) (sales|someone|a person|a human|your team|the team)\b",
+            r"\bget in touch\b"),
+        f"You can email {ONBOARDING_EMAIL} about pilots and onboarding, or {SUPPORT_EMAIL} for help with an "
+        "account, and a person on our team replies. Or leave your details here and we'll follow up.",
+        ("What does a pilot look like?", "What is CloudCare?"),
     ),
     Topic(
         "hipaa",
@@ -213,8 +223,8 @@ TOPICS: tuple[Topic, ...] = (
 )
 
 DEFAULT_REPLY = (
-    "Good question, and I don't want to guess. Someone on our team can follow up on that, "
-    "or I can tell you how Foggy works, how Epic MyChart fits in, or what a pilot looks like."
+    "Good question, and I don't want to guess. Someone on our team can follow up if you email "
+    f"{ONBOARDING_EMAIL}, or I can tell you how Foggy works, how Epic MyChart fits in, or what a pilot looks like."
 )
 DEFAULT_SUGGESTIONS = ("What is CloudCare?", "Does it work with Epic?", "What does a pilot look like?")
 

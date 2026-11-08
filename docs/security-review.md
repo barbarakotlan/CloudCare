@@ -87,6 +87,8 @@ Backend (Render dashboard and `backend/.env`; documented in `backend/.env.exampl
 | `OUTREACH_MAX_CALLS_PER_HOUR` | Calls started per hour, whole server (default 30). |
 | `CORS_ORIGINS` | Browser origins allowed to call the API (no credentials). |
 | `EPIC_TOKEN_ENCRYPTION_KEY` | Fernet key for stored Epic tokens; the API refuses `/epic` (503) without a valid key. |
+| `RESEND_API_KEY` | Server-only email provider key. Set: each stored onboarding request is also emailed to `SALES_LEAD_TO` (default `support@cloudcare.icu`) with reply-to the visitor's work email, and the `sales_emails` row records `sent` or `failed`; unset: stored only, no network call. `sync: false` in `render.yaml`. |
+| `SALES_EMAIL_FROM` | Sender for those emails, on a domain verified with the provider (default `CloudCare <no-reply@cloudcare.icu>`). `sync: false` in `render.yaml`. |
 | Server-only secrets | `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`, `ELEVENLABS_API_KEY`, `TWILIO_AUTH_TOKEN`, `EPIC_CLIENT_SECRET`, `DATABASE_URL`: Render only, never `NEXT_PUBLIC_*`. |
 
 Frontend (Vercel): `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SUPABASE_URL` (also feed the CSP),

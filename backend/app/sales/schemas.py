@@ -114,6 +114,8 @@ class RenderedEmailOut(BaseModel):
     to: str
     subject: str
     body: str
+    # 'stored' when sending is off; 'sent' or 'failed' when the API tried to send it.
+    delivery: Literal["sent", "stored", "failed"] = "stored"
 
 
 class SalesLeadCreated(BaseModel):

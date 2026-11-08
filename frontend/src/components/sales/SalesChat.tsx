@@ -275,7 +275,7 @@ export function SalesChat({
           {
             id: newMessageId(),
             role: "assistant",
-            content: `Thank you, ${name}. I've passed this to our team and someone will reach out within one business day. Want to try the live demo while you wait?`,
+            content: `Thank you, ${name}. I've passed this to our team and someone will reach out within one business day. You can also reach us any time at support@cloudcare.icu. Want to try the live demo while you wait?`,
             card: "thanks",
           },
         ],
@@ -286,7 +286,7 @@ export function SalesChat({
           ? "Too many requests from this network right now. Please try again in a little while."
           : err instanceof ApiError && err.status === 422
             ? `Something in the form needs another look: ${err.message}`
-            : "I couldn't send that just now. Your answers are still here; please try Submit again, or email sales@cloudcare.icu.",
+            : "I couldn't send that just now. Your answers are still here; please try Submit again, or email onboarding@cloudcare.icu.",
       );
     } finally {
       setLeadPending(false);

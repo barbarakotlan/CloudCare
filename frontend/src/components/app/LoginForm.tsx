@@ -474,6 +474,18 @@ export function LoginForm() {
             </Button>
           </p>
         ) : null}
+
+        {signingUp ? null : (
+          <p className="-mt-1 text-center text-sm text-ink-soft">
+            Trouble signing in?{" "}
+            <a
+              href="mailto:support@cloudcare.icu"
+              className="font-bold text-brand-cyan-strong underline decoration-brand-cyan/40 underline-offset-2 hover:decoration-brand-cyan-strong"
+            >
+              support@cloudcare.icu
+            </a>
+          </p>
+        )}
       </form>
 
       {signingUp ? null : (

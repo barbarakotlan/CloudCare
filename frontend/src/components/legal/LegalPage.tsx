@@ -24,6 +24,18 @@ export function Placeholder({ children }: { children: ReactNode }) {
   );
 }
 
+/** Marks wording that still needs a lawyer's review before the document is final. */
+export function CounselNote({ children }: { children: ReactNode }) {
+  return (
+    <p
+      role="note"
+      className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-[0.95rem] leading-snug text-amber-950 ring-1 ring-amber-300"
+    >
+      <strong className="font-extrabold text-amber-950!">For counsel review:</strong> {children}
+    </p>
+  );
+}
+
 export function DraftBanner() {
   return (
     <div

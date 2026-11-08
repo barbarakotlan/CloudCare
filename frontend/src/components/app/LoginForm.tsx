@@ -18,6 +18,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { errorMessage } from "@/lib/api/client";
+import { resetDemoOnSignIn, startsFreshDemo } from "@/lib/api/demo";
 import type { Role } from "@/lib/api/types";
 import { AUTH_PROVIDER_NAME, dashboardPathFor, login, logout, requestPasswordReset, signUpPatient } from "@/lib/auth";
 import { useSession } from "@/lib/auth/useSession";
@@ -124,6 +125,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [preparingDemo, setPreparingDemo] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotState, setForgotState] = useState<ForgotState>({ kind: "idle" });
@@ -148,7 +150,10 @@ export function LoginForm() {
   // Cache Components keeps this route mounted (hidden) after we navigate to a
   // dashboard; reset the submit state so coming back shows a usable form.
   useLayoutEffect(() => {
-    return () => setSubmitting(false);
+    return () => {
+      setSubmitting(false);
+      setPreparingDemo(false);
+    };
   }, []);
 
   function switchRole(next: Role) {
@@ -180,6 +185,12 @@ export function LoginForm() {
 
   async function onSignIn() {
     const s = await login(email, password, role);
+    if (startsFreshDemo(s.user)) {
+      // Each visitor to the shared demo patient starts from a clean Jordan Lee.
+      // Failures are ignored: the sign-in itself already worked.
+      setPreparingDemo(true);
+      await resetDemoOnSignIn();
+    }
     router.replace(dashboardPathFor(s.user.role));
   }
 
@@ -218,6 +229,7 @@ export function LoginForm() {
     } catch (err) {
       setError(errorMessage(err));
       setSubmitting(false);
+      setPreparingDemo(false);
     }
   }
 
@@ -441,6 +453,12 @@ export function LoginForm() {
           {submitLabel}
         </Button>
 
+        {submitting && preparingDemo ? (
+          <p role="status" className="-mt-1 text-center text-sm text-ink-soft">
+            Preparing a fresh demo…
+          </p>
+        ) : null}
+
         {!signingUp && role === "clinician" ? (
           <p className="text-center text-sm text-ink-soft">Care team accounts are created by your clinic.</p>
         ) : CAN_SIGN_UP ? (
@@ -467,8 +485,8 @@ export function LoginForm() {
             <code className="font-semibold text-brand-cyan-strong">{DEMO[role].password}</code>
           </p>
           <p className="mt-2 text-xs leading-relaxed text-brand-gray">
-            Shared demo account: anyone can see and reset what you enter here. Don&rsquo;t enter real health
-            information.
+            Shared demo account: anyone can see and reset what you enter here.
+            {role === "patient" ? " Signing in starts a fresh demo." : ""} Don&rsquo;t enter real health information.
           </p>
         </div>
       )}

@@ -165,7 +165,7 @@ export function CallPlayer({
           <FoggyAvatar size={44} decorative />
           <div className="min-w-0">
             <p className="font-extrabold text-ink">Foggy check-in call</p>
-            <p className="text-sm text-brand-gray">Outbound call · {formatTime(duration)}</p>
+            <p className="text-sm text-brand-gray">Sample call · {formatTime(duration)}</p>
           </div>
           {playing ? (
             <span aria-hidden="true" className="ml-auto flex h-5 items-end gap-0.5">

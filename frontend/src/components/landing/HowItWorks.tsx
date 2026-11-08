@@ -10,7 +10,7 @@ const STEPS = [
   {
     icon: MessageCircleHeart,
     title: "Foggy follows up at home",
-    body: "Text or talk to Foggy any time. It answers from your plan with the section it came from, sends reminders, and checks in on symptoms.",
+    body: "Text or talk to Foggy, an automated assistant, any time. It answers from your plan, shows your reminders, and runs symptom check-ins. It can make mistakes, so keep your written plan handy.",
   },
   {
     icon: UserRoundCheck,

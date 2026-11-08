@@ -19,7 +19,8 @@ export function SiteFooter() {
             Recovery support between discharge and your follow-up visit.
           </p>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-brand-gray">
-            CloudCare is not a medical device and does not give medical advice. In an emergency, call 911.
+            CloudCare does not give medical advice, is not intended to diagnose or treat any condition, and has not been
+            reviewed by the FDA. Foggy is an automated assistant. In an emergency, call 911.
           </p>
         </div>
         <div className="flex flex-col gap-5 md:items-end">

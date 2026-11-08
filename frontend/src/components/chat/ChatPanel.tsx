@@ -196,8 +196,8 @@ export function ChatPanel({
         <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[0.72rem] text-brand-gray">
           <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
           {mode === "demo"
-            ? "Demo answers from a sample care plan. Not medical advice."
-            : "Foggy answers only from your care plan. In an emergency, call 911."}
+            ? "Foggy is an automated assistant. Demo answers come from a sample care plan. Not medical advice."
+            : "Foggy is an automated assistant designed to answer only from your care plan. It can make mistakes. In an emergency, call 911."}
         </p>
       </div>
     </div>

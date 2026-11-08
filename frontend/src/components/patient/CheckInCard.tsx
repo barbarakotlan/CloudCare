@@ -302,6 +302,9 @@ function CheckInResult({
           {RISK_LABEL[risk.risk_level]}
         </Badge>
         <span className="text-sm text-brand-gray">Recovery risk score {pct}%</span>
+        <span className="w-full text-xs text-brand-gray">
+          Experimental estimate for your care team, not a diagnosis.
+        </span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-surface-pale" aria-hidden="true">
         <div

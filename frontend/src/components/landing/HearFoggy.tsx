@@ -17,14 +17,14 @@ export function HearFoggy() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-extrabold tracking-[0.14em] text-brand-cyan-strong uppercase">Listen in</p>
           <h2 id="hear-title" className="mt-3 text-3xl leading-tight font-black tracking-tight text-balance text-ink sm:text-5xl">
-            Hear a real check-in call.
+            Hear a sample check-in call.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-ink-soft text-pretty">
-            Foggy calls after discharge, runs the check-in one question at a time, answers from the care plan, and asks
-            before sending anything to the care team.
+            When a patient presses &ldquo;Call me,&rdquo; Foggy calls, runs the check-in one question at a time, answers
+            from the care plan, and asks before sending anything to the care team.
           </p>
           <p className="mt-3 text-sm font-semibold text-brand-gray">
-            Recorded demo call with Jordan, our fictional demo patient.
+            Dramatized sample with computer-generated voices and Jordan, our fictional demo patient.
           </p>
         </div>
 

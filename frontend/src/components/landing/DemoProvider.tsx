@@ -48,7 +48,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         description="Hands-free answers from the same care plan."
       >
         <TalkToFoggy onTryText={() => setOpenKind("chat")} />
-        <DialogNote>Your voice is processed by ElevenLabs to run the conversation.</DialogNote>
+        <DialogNote>
+          Foggy is an automated assistant. Your voice is processed by ElevenLabs and a language model, and a transcript
+          is kept for up to 30 days.
+        </DialogNote>
       </Modal>
     </DemoContext.Provider>
   );

@@ -11,6 +11,7 @@ import {
   TriangleAlert,
   UserPlus,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useLayoutEffect, useState, type FormEvent } from "react";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -116,6 +117,7 @@ export function LoginForm() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
   const [email, setEmail] = useState(DEMO.patient.email);
   const [password, setPassword] = useState(DEMO.patient.password);
   const [showPassword, setShowPassword] = useState(false);
@@ -168,6 +170,7 @@ export function LoginForm() {
       setFullName("");
       setPhone("");
       setPhoneError(null);
+      setAgreed(false);
       setEmail("");
       setPassword("");
     } else {
@@ -182,6 +185,7 @@ export function LoginForm() {
 
   async function onSignUp() {
     if (!fullName.trim()) throw new Error("Please enter your full name.");
+    if (!agreed) throw new Error("Please confirm you're 18 or older and agree to the Terms.");
     const mobile = optionalE164(phone);
     if (!mobile.ok) {
       setPhoneError(mobile.error);
@@ -217,7 +221,7 @@ export function LoginForm() {
     }
   }
 
-  const submitDisabled = submitting || !email || !password || (signingUp && !fullName.trim());
+  const submitDisabled = submitting || !email || !password || (signingUp && (!fullName.trim() || !agreed));
   const submitLabel = signingUp
     ? submitting
       ? "Creating your account…"
@@ -284,7 +288,11 @@ export function LoginForm() {
           <Field
             label="Mobile number (optional)"
             htmlFor="login-phone"
-            hint={phoneError ? undefined : "For check-in texts and calls from Foggy. US numbers by default."}
+            hint={
+              phoneError
+                ? undefined
+                : "Optional, your own number only. Foggy calls or texts it only when you press Call me or Text me. Calls are automated and aren't recorded. Message and data rates may apply."
+            }
           >
             <Input
               id="login-phone"
@@ -367,6 +375,30 @@ export function LoginForm() {
           ) : null}
         </Field>
 
+        {signingUp ? (
+          <label htmlFor="login-agree" className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-ink-soft">
+            <input
+              id="login-agree"
+              type="checkbox"
+              required
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 size-5 shrink-0 cursor-pointer rounded accent-brand-cyan-strong"
+            />
+            <span>
+              I&rsquo;m 18 or older. I agree to the{" "}
+              <Link href="/terms" className="font-bold text-brand-cyan-strong underline underline-offset-2">
+                Terms
+              </Link>{" "}
+              and have read the{" "}
+              <Link href="/privacy" className="font-bold text-brand-cyan-strong underline underline-offset-2">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+        ) : null}
+
         {CAN_RESET && !signingUp && forgotOpen ? (
           <ForgotPassword
             email={forgotEmail}
@@ -433,6 +465,10 @@ export function LoginForm() {
             {role === "clinician" ? "Doctor" : "Patient"}: <span className="font-semibold text-ink">{DEMO[role].name}</span> ·{" "}
             <code className="font-semibold text-brand-cyan-strong">{DEMO[role].email}</code> · password{" "}
             <code className="font-semibold text-brand-cyan-strong">{DEMO[role].password}</code>
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-brand-gray">
+            Shared demo account: anyone can see and reset what you enter here. Don&rsquo;t enter real health
+            information.
           </p>
         </div>
       )}

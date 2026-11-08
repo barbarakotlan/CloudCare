@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui/Button";
 const PATIENT_FEATURES = [
   "Today’s plan in plain language",
   "Medication and appointment reminders",
-  "Text or talk to Foggy, day or night",
+  "Text or talk to Foggy, any time",
   "Two-minute symptom check-ins",
 ];
 

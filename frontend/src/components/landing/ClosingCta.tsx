@@ -20,7 +20,7 @@ export function ClosingCta() {
           <DemoButton kind="voice" />
         </div>
         <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-ink-soft">
-          The demos use a sample care plan. Read how we handle your information in our{" "}
+          The demos use a sample care plan, so please don&rsquo;t enter real health information. Read how we handle your information in our{" "}
           <Link href="/privacy" className="font-bold text-brand-cyan-strong underline underline-offset-2">
             Privacy Policy
           </Link>

@@ -45,12 +45,19 @@ export default function LoginPage() {
           <p className="mt-2 text-ink-soft">Choose how you&rsquo;re signing in.</p>
           <LoginForm />
           <p className="mt-6 text-center text-sm text-brand-gray">
-            By signing in you agree to our{" "}
+            By signing in or creating an account, you agree to our{" "}
             <Link
               href="/terms"
               className="font-bold text-brand-cyan-strong underline decoration-brand-cyan/40 underline-offset-2 hover:decoration-brand-cyan-strong"
             >
               Terms
+            </Link>{" "}
+            and acknowledge our{" "}
+            <Link
+              href="/privacy"
+              className="font-bold text-brand-cyan-strong underline decoration-brand-cyan/40 underline-offset-2 hover:decoration-brand-cyan-strong"
+            >
+              Privacy Policy
             </Link>
             .
           </p>

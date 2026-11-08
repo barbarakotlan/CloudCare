@@ -39,8 +39,9 @@ export function Hero() {
         </div>
 
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft text-pretty sm:text-xl">
-          Anesthesia fog makes discharge instructions easy to forget. Foggy texts and talks you through the plan your
-          care team wrote, and helps you reach a real person whenever something isn&rsquo;t right.
+          Anesthesia fog makes discharge instructions easy to forget. Foggy, an automated assistant, texts and talks
+          you through the plan your care team wrote, and offers to message your care team when your plan doesn&rsquo;t
+          cover something.
         </p>
 
         <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -53,7 +54,7 @@ export function Hero() {
             className="top-24 -left-64 hidden lg:flex"
             icon={<CheckCircle2 className="size-5 text-ok" aria-hidden="true" />}
             title="Check-in logged"
-            body="Pain 4/10 · risk low"
+            body="Pain 4/10 · saved for your care team"
           />
           <FloatingNote
             className="top-[19rem] -right-72 hidden lg:flex"

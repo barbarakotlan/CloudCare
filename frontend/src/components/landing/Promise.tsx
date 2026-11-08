@@ -4,8 +4,8 @@ import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
 const PROMISES = [
   {
     icon: BookOpenCheck,
-    title: "Answers only from your care plan",
-    body: "Every answer shows the section it came from, so you and your clinician can check it.",
+    title: "Designed to answer only from your care plan",
+    body: "Text answers show the section they came from, so you and your clinician can check them.",
   },
   {
     icon: CircleSlash,
@@ -19,13 +19,13 @@ const PROMISES = [
   },
   {
     icon: Siren,
-    title: "Red flags skip the AI",
-    body: "Chest pain, trouble breathing, heavy bleeding or fainting gets an immediate “Call 911 now.” Foggy can’t place emergency calls, so you make that call. An alert also appears in your care team’s queue.",
+    title: "Red flags get fixed rules first",
+    body: "Chest pain, trouble breathing, heavy bleeding or fainting gets an immediate “Call 911 now.” Foggy can’t place emergency calls, so you make that call. An alert also appears in your care team’s queue, which isn’t watched around the clock.",
   },
   {
     icon: UsersRound,
     title: "Humans close every escalation",
-    body: "A clinician acknowledges and resolves each alert. The risk model ranks, people decide.",
+    body: "Each alert waits for a clinician to acknowledge and resolve it. The risk model ranks, people decide.",
   },
 ];
 
@@ -40,7 +40,7 @@ export function OurPromise() {
           </h2>
           <p className="mt-5 max-w-lg text-lg leading-relaxed text-ink-soft">
             A recovery companion should be humble by design. Foggy is grounded in the instructions your clinician wrote,
-            and it offers to bring in a person the moment it reaches the edge of them.
+            and it offers to message your care team when a question goes beyond them.
           </p>
 
           {/* Example of a declined question */}

@@ -270,8 +270,9 @@ export function TestOnPhoneCard() {
 
       {/* What each option does, before asking for a number. */}
       <p className="mb-4 text-sm leading-relaxed text-ink-soft">
-        <span className="font-bold text-ink">Call me</span> places a real phone call from Foggy to this number using
-        the same care plan. <span className="font-bold text-ink">Check in here</span> uses this screen.{" "}
+        <span className="font-bold text-ink">Call me</span> places one automated call from Foggy, in a synthetic voice,
+        to this number using the same care plan. Calls aren&rsquo;t recorded; a transcript is kept for up to 30 days.{" "}
+        <span className="font-bold text-ink">Check in here</span> uses this screen.{" "}
         {showText ? (
           <>
             <span className="font-bold text-ink">Text me</span> sends a text with a link to your check-in.{" "}

@@ -167,7 +167,9 @@ export function ClinicianDashboard({ session }: { session: Session }) {
             <Stat icon={<HeartPulse className="size-5" />} label="High risk now" value={highRisk} tone={highRisk ? "red" : "plain"} />
           </dl>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          {/* grid-cols-1 (minmax(0,1fr)) matters: an implicit auto column grows to the widest
+              nowrap text inside it, which pushed phones out to ~750 px. */}
+          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
             <EscalationQueue
               items={escalations}
               loading={escalations === undefined}
@@ -180,7 +182,7 @@ export function ClinicianDashboard({ session }: { session: Session }) {
               now={now}
               lastUpdated={lastUpdated}
             />
-            <div className="xl:sticky xl:top-24 xl:self-start">
+            <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
               <PatientTable
                 rows={patients}
                 loading={patients === undefined}

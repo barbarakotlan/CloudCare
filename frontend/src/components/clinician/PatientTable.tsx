@@ -52,7 +52,7 @@ export function PatientTable({
   onOpen: (row: PatientRow) => void;
 }) {
   return (
-    <Card aria-labelledby="patients-title">
+    <Card aria-labelledby="patients-title" className="min-w-0">
       <CardHeader
         id="patients-title"
         icon={<UsersRound className="size-5" aria-hidden="true" />}

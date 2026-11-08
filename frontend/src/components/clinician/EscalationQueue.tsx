@@ -39,7 +39,7 @@ export function EscalationQueue({
   lastUpdated: number | null;
 }) {
   return (
-    <Card aria-labelledby="queue-title" className="p-0 sm:p-0">
+    <Card aria-labelledby="queue-title" className="min-w-0 p-0 sm:p-0">
       <div className="p-5 pb-0 sm:p-6 sm:pb-0">
         <CardHeader
           id="queue-title"
@@ -182,11 +182,11 @@ function EscalationItem({
         </Badge>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+      <div className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-2">
         <button
           type="button"
           onClick={() => onOpenPatient(item.patient_id)}
-          className="rounded-md text-lg font-extrabold text-ink underline-offset-4 hover:text-brand-cyan-strong hover:underline"
+          className="min-w-0 rounded-md text-left text-lg font-extrabold break-words text-ink underline-offset-4 hover:text-brand-cyan-strong hover:underline"
         >
           {item.patient_name}
         </button>
@@ -194,9 +194,9 @@ function EscalationItem({
           {now !== null ? relativeTime(item.created_at, now) : formatDateTime(item.created_at)}
         </span>
       </div>
-      <p className="mt-1 leading-relaxed text-ink-soft">{item.summary}</p>
+      <p className="mt-1 leading-relaxed break-words text-ink-soft">{item.summary}</p>
       {item.clinician_notes ? (
-        <p className="mt-2 rounded-2xl bg-surface-soft px-3 py-2 text-sm text-ink-soft">
+        <p className="mt-2 rounded-2xl bg-surface-soft px-3 py-2 text-sm break-words text-ink-soft">
           <span className="font-bold text-ink">Note: </span>
           {item.clinician_notes}
         </p>

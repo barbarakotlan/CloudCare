@@ -67,7 +67,7 @@ export function PatientDashboard({ session }: { session: Session }) {
             onTalk={() => setVoiceOpen(true)}
           />
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
               <RemindersCard now={now} notify={push} />
             </div>

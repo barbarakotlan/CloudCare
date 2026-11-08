@@ -199,10 +199,6 @@ def decode_token(token: str) -> dict:
 
 # ---- Supabase users -> local users rows ---------------------------------------
 
-def _first_clinician(db: Session) -> User | None:
-    return db.scalar(select(User).where(User.role == "clinician").order_by(User.created_at).limit(1))
-
-
 def _signup_phone(raw: str | None) -> str | None:
     """The sign-up mobile number in E.164, or None if missing or unusable (never blocks sign-in)."""
     if not raw:
@@ -215,14 +211,17 @@ def _signup_phone(raw: str | None) -> str | None:
 
 
 def _ensure_patient_profile(db: Session, user: User, phone: str | None = None) -> None:
-    """Gives a new patient a placeholder profile so /patients/me works on first login."""
+    """Gives a new patient a placeholder profile so /patients/me works on first login.
+
+    The profile starts with no clinician: a self sign-up stays out of every clinician's
+    worklist until a clinician claims it (GET /patients/unassigned, POST /patients/{id}/assign).
+    """
     if db.scalar(select(Patient.id).where(Patient.user_id == user.id)) is not None:
         return
-    clinician = _first_clinician(db)
     db.add(
         Patient(
             user_id=user.id,
-            clinician_id=clinician.id if clinician else None,
+            clinician_id=None,
             procedure_name=PLACEHOLDER_PROCEDURE,
             procedure_type="unknown",
             surgery_date=date.today(),
@@ -230,8 +229,6 @@ def _ensure_patient_profile(db: Session, user: User, phone: str | None = None) -
             phone=_signup_phone(phone),
         )
     )
-    if clinician is None:
-        log.warning("No clinician exists yet; patient %s was created without an assigned clinician.", user.email)
 
 
 def _user_from_supabase(db: Session, claims: dict) -> User:

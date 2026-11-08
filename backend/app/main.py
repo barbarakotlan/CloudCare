@@ -10,7 +10,7 @@ from app import models  # noqa: F401  (registers all tables on Base)
 from app import epic
 from app.database import Base, SessionLocal, engine, get_db
 from app.outreach.router import router as outreach_router
-from app.routes import auth, chat, escalations, patients, recovery, symptoms
+from app.routes import auth, chat, demo, escalations, patients, recovery, symptoms
 from app.seed import seed_demo_users
 
 
@@ -51,6 +51,7 @@ app.include_router(escalations.router)
 app.include_router(recovery.router)
 app.include_router(epic.router)
 app.include_router(outreach_router)
+app.include_router(demo.router)
 
 
 @app.get("/")

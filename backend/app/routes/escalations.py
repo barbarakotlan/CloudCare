@@ -23,6 +23,7 @@ def to_out(e: Escalation) -> EscalationOut:
         id=e.id, patient_id=e.patient_id, patient_name=e.patient.user.full_name,
         trigger_type=e.trigger_type, severity=e.severity, summary=e.summary, status=e.status,
         clinician_notes=e.clinician_notes, created_at=e.created_at, resolved_at=e.resolved_at,
+        reviewed_by_name=e.reviewer.full_name if e.reviewer else None, acknowledged_at=e.acknowledged_at,
     )
 
 
@@ -56,11 +57,17 @@ def update_escalation(
     e = db.get(Escalation, escalation_id)
     if e is None or e.patient.clinician_id != clinician.id:
         raise HTTPException(404, "Escalation not found")
+    now = datetime.now(timezone.utc)
+    if body.status == "acknowledged" and (e.status != "acknowledged" or e.acknowledged_at is None):
+        e.acknowledged_at = now
+    elif body.status == "open":
+        e.acknowledged_at = None  # reopened: no longer acknowledged
+    # resolved keeps acknowledged_at as a record of when it was first picked up
     e.status = body.status
     if body.clinician_notes is not None:
         e.clinician_notes = body.clinician_notes
     e.reviewed_by = clinician.id
-    e.resolved_at = datetime.now(timezone.utc) if body.status == "resolved" else None
+    e.resolved_at = now if body.status == "resolved" else None
     db.commit()
     db.refresh(e)
     return to_out(e)

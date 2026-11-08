@@ -22,14 +22,31 @@ class RiskOut(ORM):
 
 
 class PatientRow(BaseModel):
-    """One row in the clinician's patient list."""
+    """One row in the clinician's patient list.
+
+    Current urgency (open alerts) is kept apart from the model's risk estimate:
+    open_emergencies / open_high count unresolved escalations by severity, and
+    latest_risk_at says when the risk score was computed (its check-in time).
+    """
     id: uuid.UUID
     full_name: str
     procedure_name: str
     surgery_date: date
     latest_risk: RiskOut | None
-    open_escalations: int
+    open_escalations: int  # open + acknowledged, any severity
+    open_emergencies: int = 0  # unresolved escalations with severity "emergency"
+    open_high: int = 0  # unresolved escalations with severity "high"
+    last_alert_at: datetime | None = None  # newest escalation for this patient, any status
+    latest_risk_at: datetime | None = None  # same as latest_risk.created_at
     last_checkin_at: datetime | None
+
+
+class UnassignedPatientOut(BaseModel):
+    """A patient with no clinician yet (e.g. a self sign-up), for a clinician to claim."""
+    id: uuid.UUID
+    full_name: str
+    procedure_name: str
+    created_at: datetime
 
 
 class PatientOut(ORM):
@@ -228,8 +245,20 @@ class EscalationOut(BaseModel):
     clinician_notes: str | None
     created_at: datetime
     resolved_at: datetime | None
+    # Who last changed the status (acknowledged, resolved or reopened), and when it was acknowledged.
+    reviewed_by_name: str | None = None
+    acknowledged_at: datetime | None = None
 
 
 class EscalationUpdate(BaseModel):
     status: Literal["open", "acknowledged", "resolved"]
     clinician_notes: str | None = None
+
+
+# ---- Demo -------------------------------------------------------------------
+
+class DemoResetOut(BaseModel):
+    """Rows removed for the shared demo patient, per table, and baseline rows put back."""
+    reset: bool
+    counts: dict[str, int]
+    restored: dict[str, int]

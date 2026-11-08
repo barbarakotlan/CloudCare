@@ -8,7 +8,9 @@ from app.auth import get_current_patient, get_patient_for_clinician, require_cli
 from app.database import get_db
 from app.models import CarePlan, CarePlanChunk, Escalation, Patient, RiskScore, SymptomLog, User
 from app.outreach.phone import PhoneError, normalize_e164
-from app.schemas import CarePlanIn, CarePlanOut, PatientMeUpdate, PatientOut, PatientRow, PatientUpdate, RiskOut
+from app.schemas import (
+    CarePlanIn, CarePlanOut, PatientMeUpdate, PatientOut, PatientRow, PatientUpdate, RiskOut, UnassignedPatientOut,
+)
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -38,26 +40,82 @@ def apply_phone(patient: Patient, raw: str | None) -> None:
         patient.phone_verified_at = None
 
 
+def _worklist_order(row: PatientRow) -> tuple:
+    """Open emergencies, then open high alerts, then any open alerts, then model risk, then name."""
+    return (
+        -row.open_emergencies,
+        -row.open_high,
+        -row.open_escalations,
+        -(row.latest_risk.score if row.latest_risk else -1.0),
+        row.full_name.lower(),
+    )
+
+
 @router.get("", response_model=list[PatientRow])
 def list_my_patients(db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
-    """Clinician dashboard: assigned patients, highest risk first."""
+    """Clinician worklist: assigned patients only (never unassigned sign-ups), most urgent first."""
     rows = []
     for p in db.scalars(select(Patient).where(Patient.clinician_id == clinician.id)):
         latest = db.scalar(
             select(RiskScore).where(RiskScore.patient_id == p.id).order_by(RiskScore.created_at.desc()).limit(1)
         )
-        open_count = db.scalar(
-            select(func.count()).select_from(Escalation)
+        open_by_severity = dict(db.execute(
+            select(Escalation.severity, func.count())
             .where(Escalation.patient_id == p.id, Escalation.status != "resolved")
-        )
+            .group_by(Escalation.severity)
+        ).all())
+        last_alert = db.scalar(select(func.max(Escalation.created_at)).where(Escalation.patient_id == p.id))
         last_checkin = db.scalar(select(func.max(SymptomLog.logged_at)).where(SymptomLog.patient_id == p.id))
         rows.append(PatientRow(
             id=p.id, full_name=p.user.full_name, procedure_name=p.procedure_name,
             surgery_date=p.surgery_date, latest_risk=RiskOut.model_validate(latest) if latest else None,
-            open_escalations=open_count or 0, last_checkin_at=last_checkin,
+            open_escalations=sum(open_by_severity.values()),
+            open_emergencies=open_by_severity.get("emergency", 0),
+            open_high=open_by_severity.get("high", 0),
+            last_alert_at=last_alert,
+            latest_risk_at=latest.created_at if latest else None,
+            last_checkin_at=last_checkin,
         ))
-    rows.sort(key=lambda r: (r.latest_risk.score if r.latest_risk else -1), reverse=True)
+    rows.sort(key=_worklist_order)
     return rows
+
+
+@router.get("/unassigned", response_model=list[UnassignedPatientOut])
+def list_unassigned(db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
+    """Patients no clinician has picked up yet (self sign-ups), newest first.
+
+    Only what a clinician needs to recognise the person; nothing clinical.
+    """
+    patients = db.scalars(
+        select(Patient).where(Patient.clinician_id.is_(None)).order_by(Patient.created_at.desc())
+    )
+    return [
+        UnassignedPatientOut(
+            id=p.id, full_name=p.user.full_name, procedure_name=p.procedure_name, created_at=p.created_at,
+        )
+        for p in patients
+    ]
+
+
+@router.post("/{patient_id}/assign", response_model=PatientOut)
+def assign_to_me(patient_id: uuid.UUID, db: Session = Depends(get_db), clinician: User = Depends(require_clinician)):
+    """The calling clinician takes on an unassigned patient. 409 if another clinician already has them."""
+    patient = db.get(Patient, patient_id)
+    if patient is None:
+        raise HTTPException(404, "Patient not found")
+    if patient.clinician_id is not None and patient.clinician_id != clinician.id:
+        raise HTTPException(409, "Patient is already assigned to another clinician")
+    if patient.clinician_id is None:
+        # Conditional update so two clinicians claiming at once can't both win.
+        claimed = db.execute(
+            update(Patient).where(Patient.id == patient.id, Patient.clinician_id.is_(None))
+            .values(clinician_id=clinician.id)
+        ).rowcount
+        db.commit()
+        if not claimed:
+            raise HTTPException(409, "Patient is already assigned to another clinician")
+        db.refresh(patient)
+    return to_patient_out(patient)
 
 
 @router.get("/me", response_model=PatientOut)

@@ -430,4 +430,10 @@ def seed_demo_cohort(db: Session, clinician: User, jordan: Patient) -> None:
     # Jordan: add earlier check-ins once (only if he has none yet).
     has_checkins = db.scalar(select(SymptomLog.id).where(SymptomLog.patient_id == jordan.id).limit(1))
     if has_checkins is None:
-        _add_checkins(db, jordan, JORDAN_CHECKINS, escalate_high=False)
+        add_jordan_baseline_checkins(db, jordan)
+
+
+def add_jordan_baseline_checkins(db: Session, jordan: Patient) -> int:
+    """The main demo patient's two earlier low-risk check-ins (with risk scores). Returns how many."""
+    _add_checkins(db, jordan, JORDAN_CHECKINS, escalate_high=False)
+    return len(JORDAN_CHECKINS)

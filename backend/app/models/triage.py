@@ -115,5 +115,8 @@ class Escalation(Base):
     clinician_notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at()
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When a clinician acknowledged it (database/escalations_ack.sql). Cleared on reopen.
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     patient: Mapped["Patient"] = relationship(back_populates="escalations")
+    reviewer: Mapped["User | None"] = relationship(foreign_keys=[reviewed_by])

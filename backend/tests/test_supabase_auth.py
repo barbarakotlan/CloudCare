@@ -204,7 +204,37 @@ def test_first_supabase_login_creates_patient_with_placeholder_profile():
     with TestSession() as db:
         assert len(db.scalars(select(User).where(User.email == "new.patient@example.com")).all()) == 1
         patient = db.scalar(select(Patient).where(Patient.user_id == uuid.UUID(sub)))
-        assert patient is not None and patient.clinician_id == clinician_id
+        # Self sign-ups start unassigned; a clinician has to claim them.
+        assert patient is not None and patient.clinician_id is None
+        assert clinician_id is not None
+
+
+def test_new_signup_hidden_from_clinician_until_assigned():
+    _configure_supabase()
+    client, TestSession = _test_client()
+    with TestSession() as db:
+        clinician = User(email="doc@example.com", full_name="Dr. Doc", role="clinician", password_hash="x")
+        db.add(clinician)
+        db.commit()
+        doc_headers = {"Authorization": f"Bearer {auth.create_token(clinician)}"}
+
+    sub = str(uuid.uuid4())
+    patient_headers = {"Authorization": f"Bearer {_supabase_token(sub=sub, email='real.person@example.com')}"}
+    assert client.get("/patients/me", headers=patient_headers).status_code == 200
+
+    assert client.get("/patients", headers=doc_headers).json() == []
+    unassigned = client.get("/patients/unassigned", headers=doc_headers)
+    assert unassigned.status_code == 200, unassigned.text
+    [row] = unassigned.json()
+    assert row["full_name"] == "Casey Rivera" and row["procedure_name"] == auth.PLACEHOLDER_PROCEDURE
+    assert set(row) == {"id", "full_name", "procedure_name", "created_at"}
+    # Not readable before it is claimed.
+    assert client.get(f"/patients/{row['id']}", headers=doc_headers).status_code == 404
+
+    claimed = client.post(f"/patients/{row['id']}/assign", headers=doc_headers)
+    assert claimed.status_code == 200, claimed.text
+    assert [p["id"] for p in client.get("/patients", headers=doc_headers).json()] == [row["id"]]
+    assert client.get("/patients/unassigned", headers=doc_headers).json() == []
 
 
 def test_supabase_clinician_role_from_app_metadata():

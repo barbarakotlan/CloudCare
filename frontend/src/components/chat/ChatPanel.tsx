@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowUp, ShieldCheck } from "lucide-react";
+import { ArrowUp, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { SkeletonLines } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/cn";
-import { DEMO_SUGGESTIONS } from "@/lib/demo/foggyScript";
+import { CONTACT_NO, CONTACT_YES, DEMO_SUGGESTIONS } from "@/lib/demo/foggyScript";
 import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import type { UiMessage } from "./types";
@@ -34,6 +34,13 @@ export function ChatPanel({
   const inputId = useId();
   const suggestions = mode === "demo" ? DEMO_SUGGESTIONS : LIVE_SUGGESTIONS;
   const patientCount = messages.filter((m) => m.role === "patient").length;
+  const last = messages.at(-1);
+  // Quick replies answer only the offer in the newest Foggy message.
+  const showQuickReplies = !pending && last?.role === "assistant" && last.offerContact;
+  const lastReply = messages.findLast((m) => m.role === "assistant");
+  const checkinStep = lastReply?.checkin?.step;
+  const checkinQuestion = typeof checkinStep === "number" ? checkinStep : null;
+  const inCheckin = checkinQuestion !== null;
 
   useEffect(() => {
     const el = listRef.current;
@@ -88,6 +95,24 @@ export function ChatPanel({
         {messages.map((m, i) => (
           <MessageBubble key={m.id} message={m} showAvatar={messages[i + 1]?.role !== m.role || m.role === "patient"} />
         ))}
+        {showQuickReplies ? (
+          <div className="ml-10 flex flex-wrap gap-2" role="group" aria-label="Reply to Foggy">
+            <button
+              type="button"
+              onClick={() => void send(CONTACT_YES)}
+              className="min-h-10 rounded-full bg-brand-cyan px-4 py-2 text-sm font-bold text-white shadow-[0_6px_16px_-8px_rgb(25_154_192/0.6)] transition-colors hover:bg-brand-cyan-strong"
+            >
+              {CONTACT_YES}
+            </button>
+            <button
+              type="button"
+              onClick={() => void send(CONTACT_NO)}
+              className="min-h-10 rounded-full bg-white px-4 py-2 text-sm font-bold text-ink-soft ring-1 ring-line ring-inset transition-colors hover:bg-surface-soft hover:text-ink"
+            >
+              {CONTACT_NO}
+            </button>
+          </div>
+        ) : null}
         {pending ? (
           <div className="flex items-end gap-2">
             <span className="size-8 shrink-0" aria-hidden="true" />
@@ -97,7 +122,23 @@ export function ChatPanel({
       </div>
 
       <div className="border-t border-line/70 bg-white px-3 pt-3 pb-3 sm:px-4">
-        {patientCount < 2 && !historyLoading ? (
+        {checkinQuestion !== null ? (
+          <p className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-cyan-strong" aria-live="polite">
+            <span className="flex gap-1" aria-hidden="true">
+              {[1, 2, 3, 4].map((n) => (
+                <span key={n} className={cn("size-1.5 rounded-full", n <= checkinQuestion ? "bg-brand-cyan" : "bg-line")} />
+              ))}
+            </span>
+            Check-in &middot; question {checkinQuestion} of 4
+          </p>
+        ) : null}
+        {checkinStep === "done" ? (
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[#146b49]" aria-live="polite">
+            <CheckCircle2 className="size-3.5" aria-hidden="true" />
+            {mode === "demo" ? "Demo check-in finished · nothing was saved" : "Check-in saved"}
+          </p>
+        ) : null}
+        {patientCount < 2 && !historyLoading && !inCheckin && !showQuickReplies ? (
           <div className="-mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Suggested questions">
             {suggestions.map((s) => (
               <button

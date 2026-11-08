@@ -105,6 +105,16 @@ export type Citation = { chunk_id: string; section: string };
 
 export type ChatRole = "patient" | "assistant" | "clinician";
 
+/** How Foggy handled a turn (care-team contact policy). */
+export type ChatRoute =
+  | "ANSWER_FROM_PLAN"
+  | "NOT_IN_PLAN"
+  | "REFUSE_DOSE_CHANGE"
+  | "EMERGENCY_911"
+  | "START_CHECKIN"
+  | "CALL_SURGEON"
+  | "OPERATIONAL";
+
 export type ChatMessageOut = {
   id: string;
   role: ChatRole;
@@ -113,9 +123,42 @@ export type ChatMessageOut = {
   answered_from_plan: boolean | null;
   red_flag: boolean;
   created_at: string;
+  /** Present on assistant messages from backends that route replies; absent on older ones. */
+  route?: ChatRoute | null;
 };
 
-export type ChatReply = { message: ChatMessageOut; escalated: boolean };
+export type ChatSource = "chat" | "voice";
+
+export type ChatIn = { message: string; source?: ChatSource };
+
+/** An action Foggy offered and is waiting for the patient to agree to. */
+export type PendingAction = { kind: "message_care_team"; recipient: "care_team"; reason: string };
+
+/** What actually happened to an action this turn. Only "sent" means a real message was queued. */
+export type ActionResult = { kind: string; status: "sent" | "failed" | "simulated"; detail?: string | null };
+
+export type CheckinStep = 1 | 2 | 3 | 4 | "done";
+
+export type CheckinState = { step: CheckinStep; answers: Record<string, unknown> };
+
+export type ChatReply = {
+  message: ChatMessageOut;
+  route?: ChatRoute | null;
+  /** Foggy asked whether to contact the care team; show the yes / no quick replies. */
+  offer_contact?: boolean;
+  pending_action?: PendingAction | null;
+  action_result?: ActionResult | null;
+  checkin?: CheckinState | null;
+  /** True only when a real escalation row was created this turn. */
+  escalated: boolean;
+};
+
+export type ChatCapabilities = {
+  message_care_team: boolean;
+  call_care_team: boolean;
+  emergency_call_assist: boolean;
+  simulated: boolean;
+};
 
 export type EscalationTrigger = "red_flag" | "high_risk" | "unanswered_question" | "patient_request";
 export type Severity = "low" | "medium" | "high" | "emergency";

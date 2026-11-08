@@ -289,10 +289,10 @@ function CheckInResult({
         <div className="rounded-3xl bg-brand-red/8 p-4 ring-1 ring-brand-red/25">
           <p className="flex items-center gap-2 font-extrabold text-brand-red-dark">
             <TriangleAlert className="size-5" aria-hidden="true" />
-            Your care team has been alerted
+            Your care team&rsquo;s queue has this check-in
           </p>
           <p className="mt-1 text-sm text-ink-soft">
-            Someone from Dr. Patel&rsquo;s team will reach out soon.
+            If you need help now, call your medical team.
             {shortnessOfBreath ? " If you have trouble breathing or chest pain, call 911 now." : ""}
           </p>
         </div>

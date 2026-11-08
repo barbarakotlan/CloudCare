@@ -5,7 +5,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
-import type { UiMessage } from "@/components/chat/types";
+import { isEmergency, type UiMessage } from "@/components/chat/types";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ToastViewport, useToasts } from "@/components/ui/Toast";
@@ -40,12 +40,15 @@ export function PatientDashboard({ session }: { session: Session }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const { toasts, push, dismiss } = useToasts();
 
+  // Fires only when the backend really filed an escalation this turn.
   const onEscalated = useCallback(
     (m: UiMessage) =>
       push(
-        m.redFlag
-          ? { tone: "alert", title: "Care team alerted", body: "If this is an emergency, call 911 now." }
-          : { tone: "info", title: "Sent to your care team", body: "Foggy didn’t guess. A person will follow up." },
+        isEmergency(m)
+          ? { tone: "alert", title: "Call 911 now", body: "Your care team’s queue also has this alert." }
+          : m.actionResult?.status === "sent"
+            ? { tone: "info", title: "Message sent", body: "It’s in your care team’s queue." }
+            : { tone: "info", title: "Added to your care team’s queue", body: "If you need help now, call your medical team." },
       ),
     [push],
   );

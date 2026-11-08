@@ -3,9 +3,11 @@
 import { AlertOctagon, BellRing, HeartPulse, UsersRound } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
+import { DemoResetControl, describeReset } from "@/components/app/DemoResetControl";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ToastViewport, useToasts } from "@/components/ui/Toast";
 import { errorMessage } from "@/lib/api/client";
+import type { DemoResetOut } from "@/lib/api/demo";
 import { listEscalations, updateEscalation } from "@/lib/api/escalations";
 import { listPatients } from "@/lib/api/patients";
 import type { EscalationOut, EscalationStatus, PatientOut, PatientRow } from "@/lib/api/types";
@@ -143,6 +145,12 @@ export function ClinicianDashboard({ session }: { session: Session }) {
     }
   }
 
+  function onDemoReset(result: DemoResetOut) {
+    push({ tone: "success", title: "Demo patient reset", body: describeReset(result) });
+    setSelectedId(null); // its cached chat and check-ins are gone now
+    void refresh(new AbortController().signal);
+  }
+
   function onProfileSaved(saved: PatientOut) {
     setPatients((rows) =>
       rows?.map((r) =>
@@ -164,12 +172,15 @@ export function ClinicianDashboard({ session }: { session: Session }) {
       <AppHeader user={session.user} />
       <main id="main" className="flex-1 bg-surface-soft">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-bold text-brand-gray">{now !== null ? greetingFor(now) : "Hello"},</p>
-            <h1 className="text-3xl font-black tracking-tight text-ink sm:text-4xl">
-              Dr. {session.user.full_name.replace(/^Dr\.?\s+/i, "").split(/\s+/).pop()}
-            </h1>
-            <p className="text-ink-soft">Here&rsquo;s who needs you. Foggy handles the rest from each patient&rsquo;s plan.</p>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="text-sm font-bold text-brand-gray">{now !== null ? greetingFor(now) : "Hello"},</p>
+              <h1 className="text-3xl font-black tracking-tight text-ink sm:text-4xl">
+                Dr. {session.user.full_name.replace(/^Dr\.?\s+/i, "").split(/\s+/).pop()}
+              </h1>
+              <p className="text-ink-soft">Here&rsquo;s who needs you. Foggy handles the rest from each patient&rsquo;s plan.</p>
+            </div>
+            <DemoResetControl variant="button" onReset={onDemoReset} />
           </div>
 
           <dl className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

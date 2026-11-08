@@ -3,6 +3,7 @@
 import { AudioLines } from "lucide-react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app/AppHeader";
+import { DemoResetControl } from "@/components/app/DemoResetControl";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
 import { isEmergency, type UiMessage } from "@/components/chat/types";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ToastViewport, useToasts } from "@/components/ui/Toast";
 import { TalkToFoggy } from "@/components/voice/TalkToFoggy";
+import { isDemoEmail } from "@/lib/api/demo";
 import { getMyCarePlan, getMyProfile } from "@/lib/api/patients";
 import type { Session } from "@/lib/auth";
 import { RequireRole } from "@/lib/auth/RequireRole";
@@ -106,6 +108,18 @@ export function PatientDashboard({ session }: { session: Session }) {
               <MyChartCard notify={push} now={now} />
             </div>
           </div>
+
+          {isDemoEmail(session.user.email) ? (
+            <footer className="mt-10 border-t border-line/70 pt-6">
+              <DemoResetControl
+                variant="link"
+                onReset={() => {
+                  // Chat, check-ins and doses all changed underneath this page: start fresh.
+                  window.location.reload();
+                }}
+              />
+            </footer>
+          ) : null}
         </div>
       </main>
 

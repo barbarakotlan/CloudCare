@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ToastViewport, useToasts } from "@/components/ui/Toast";
 import { TalkToFoggy } from "@/components/voice/TalkToFoggy";
+import { VOICE_ENABLED } from "@/components/voice/voiceEnabled";
 import { isDemoEmail } from "@/lib/api/demo";
 import { getMyCarePlan, getMyProfile } from "@/lib/api/patients";
 import type { Session } from "@/lib/auth";
@@ -88,10 +89,12 @@ export function PatientDashboard({ session }: { session: Session }) {
                   </h2>
                   <p className="truncate text-sm text-brand-gray">Answers from your care plan, 24/7</p>
                 </div>
-                <Button variant="soft" size="sm" onClick={() => setVoiceOpen(true)} aria-haspopup="dialog">
-                  <AudioLines className="size-4" aria-hidden="true" />
-                  Talk
-                </Button>
+                {VOICE_ENABLED ? (
+                  <Button variant="soft" size="sm" onClick={() => setVoiceOpen(true)} aria-haspopup="dialog">
+                    <AudioLines className="size-4" aria-hidden="true" />
+                    Talk
+                  </Button>
+                ) : null}
               </div>
               <ChatPanel mode="live" className="flex-1" onEscalated={onEscalated} />
             </section>
@@ -125,14 +128,16 @@ export function PatientDashboard({ session }: { session: Session }) {
         </div>
       </main>
 
-      <Modal
-        open={voiceOpen}
-        onClose={() => setVoiceOpen(false)}
-        title="Talk to Foggy"
-        description="Hands-free answers from your care plan."
-      >
-        <TalkToFoggy />
-      </Modal>
+      {VOICE_ENABLED ? (
+        <Modal
+          open={voiceOpen}
+          onClose={() => setVoiceOpen(false)}
+          title="Talk to Foggy"
+          description="Hands-free answers from your care plan."
+        >
+          <TalkToFoggy />
+        </Modal>
+      ) : null}
       <ToastViewport toasts={toasts} onDismiss={dismiss} />
     </>
   );

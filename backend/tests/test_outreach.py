@@ -56,6 +56,8 @@ TWILIO_SID = "AC" + "a" * 32
 MESSAGE_SID = "SM" + "b" * 32
 
 ENV = {
+    # Texts and calls are off unless this master switch is on.
+    "OUTREACH_ENABLED": "true",
     "TWILIO_ACCOUNT_SID": TWILIO_SID,
     "TWILIO_AUTH_TOKEN": "test-twilio-token",
     "TWILIO_FROM_NUMBER": "+15550001111",
@@ -188,6 +190,7 @@ def test_emergency_and_service_numbers_refused():
 
 def test_capabilities_not_configured():
     client, _, ctx = _setup(configured=False)
+    _env(False, OUTREACH_ENABLED="true")
     res = client.get("/outreach/capabilities", headers=ctx["patient"])
     assert res.status_code == 200, res.text
     body = res.json()
@@ -225,6 +228,7 @@ def test_patients_only():
 
 def test_sms_not_configured_sends_nothing():
     client, _, ctx = _setup(configured=False)
+    _env(False, OUTREACH_ENABLED="true")
     rec = _mock(_twilio_ok)
     res = client.post("/outreach/sms", headers=ctx["patient"], json={"kind": "checkin"})
     assert res.status_code == 503 and res.json()["detail"] == "Texting isn't set up on this server yet."
@@ -477,6 +481,7 @@ def test_call_rate_limited_and_never_to_bad_numbers():
 
 def test_call_not_configured():
     client, _, ctx = _setup(configured=False)
+    _env(False, OUTREACH_ENABLED="true")
     rec = _mock(_eleven_ok)
     res = client.post("/outreach/call", headers=ctx["patient"], json={"kind": "checkin"})
     assert res.status_code == 503 and res.json()["detail"] == "Phone calls aren't set up on this server yet."
@@ -484,6 +489,69 @@ def test_call_not_configured():
     # A config error doesn't use up the patient's slot.
     _env(True)
     assert client.post("/outreach/call", headers=ctx["patient"], json={"kind": "checkin"}).status_code == 200
+
+
+# ---- master switch (OUTREACH_ENABLED) -------------------------------------------------
+
+PAUSED = "Calls and texts from Foggy are paused."
+
+
+def _paused_env(value: str | None):
+    """Every provider key set, with OUTREACH_ENABLED unset or set to `value`."""
+    _env(True, OUTREACH_ENABLED=value)
+
+
+def test_switch_off_by_default_and_strict():
+    for value in (None, "", "false", "0", "off", "no", "enabled", "TRUEISH", " "):
+        _paused_env(value)
+        settings = outreach_config.get_settings()
+        assert settings.enabled is False, value
+        assert settings.sms_configured is False and settings.call_configured is False, value
+        # The keys themselves are all present: only the switch is off.
+        assert settings.sms_missing == [] and settings.call_missing == [], value
+    for value in ("1", "true", "TRUE", "on", "On", "yes", " yes "):
+        _paused_env(value)
+        settings = outreach_config.get_settings()
+        assert settings.enabled is True and settings.sms_configured and settings.call_configured, value
+
+
+def test_switch_off_capabilities_report_paused():
+    client, _, ctx = _setup()
+    _paused_env(None)
+    rec = _mock(_eleven_ok)
+    res = client.get("/outreach/capabilities", headers=ctx["patient"])
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["sms"] is False and body["call"] is False
+    assert body["reasons"]["sms"] == PAUSED and body["reasons"]["call"] == PAUSED
+    assert body["phone_on_file"] is True and body["phone_last4"] == "5678"
+    assert rec.requests == []
+
+
+def test_switch_off_call_and_text_send_nothing():
+    for value in (None, "false"):
+        client, TestSession, ctx = _setup()
+        _paused_env(value)
+        seen: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return _eleven_ok(request) if "elevenlabs" in request.url.host else _twilio_ok(request)
+
+        _mock(handler)
+        for path in ("/outreach/call", "/outreach/sms"):
+            res = client.post(path, headers=ctx["patient"], json={"kind": "checkin"})
+            assert res.status_code == 503, (value, path, res.text)
+            assert res.json()["detail"] == PAUSED
+        assert client.get(f"/outreach/sms/{MESSAGE_SID}", headers=ctx["patient"]).status_code == 503
+        assert seen == [], value
+        with TestSession() as db:
+            assert db.scalars(select(OutreachLog)).all() == []
+
+        # Switching it on is all it takes; the paused attempts used up no slot.
+        _paused_env("true")
+        assert client.post("/outreach/call", headers=ctx["patient"], json={"kind": "checkin"}).status_code == 200
+        assert len(seen) == 1
 
 
 def test_unknown_kind_rejected():

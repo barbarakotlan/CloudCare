@@ -8,6 +8,7 @@ import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
 import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { TalkToFoggy } from "@/components/voice/TalkToFoggy";
+import { VOICE_ENABLED } from "@/components/voice/voiceEnabled";
 
 type DemoKind = "chat" | "voice";
 type DemoContextValue = { open: (kind: DemoKind) => void };
@@ -41,18 +42,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         <ChatPanel mode="demo" className="flex-1" autoFocus />
         <DialogNote>This demo runs in your browser. Nothing you type here is sent to anyone.</DialogNote>
       </Modal>
-      <Modal
-        open={openKind === "voice"}
-        onClose={close}
-        title="Talk to Foggy"
-        description="Hands-free answers from the same care plan."
-      >
-        <TalkToFoggy onTryText={() => setOpenKind("chat")} />
-        <DialogNote>
-          Foggy is an automated assistant. Your voice is processed by ElevenLabs and a language model, and a transcript
-          is kept for up to 30 days.
-        </DialogNote>
-      </Modal>
+      {/* Voice is billed per session, so it only exists when switched on (voiceEnabled.ts). */}
+      {VOICE_ENABLED ? (
+        <Modal
+          open={openKind === "voice"}
+          onClose={close}
+          title="Talk to Foggy"
+          description="Hands-free answers from the same care plan."
+        >
+          <TalkToFoggy onTryText={() => setOpenKind("chat")} />
+          <DialogNote>
+            Foggy is an automated assistant. Your voice is processed by ElevenLabs and a language model, and a
+            transcript is kept for up to 30 days.
+          </DialogNote>
+        </Modal>
+      ) : null}
     </DemoContext.Provider>
   );
 }
@@ -84,6 +88,7 @@ export function DemoButton({
 }) {
   const ctx = useContext(DemoContext);
   if (!ctx) throw new Error("DemoButton must be inside <DemoProvider>");
+  if (kind === "voice" && !VOICE_ENABLED) return null;
   const Icon = kind === "chat" ? MessageCircle : AudioLines;
   return (
     <Button

@@ -71,6 +71,10 @@ services:
         value: "true"
       # Texts and calls to the patient's own phone (docs/phone-outreach.md). Without
       # these, /outreach reports "not set up". Apply database/patient_phone.sql first.
+      # Master switch: texts and calls cost money, so nothing is sent unless this is
+      # "true" (or 1/on/yes), even with every key below set. Off: "paused".
+      - key: OUTREACH_ENABLED
+        value: "false"
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN

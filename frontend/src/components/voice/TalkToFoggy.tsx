@@ -4,6 +4,7 @@ import { CloudOff, MessageCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
 import { FoggyAvatar } from "@/components/chat/FoggyAvatar";
+import { VOICE_ENABLED } from "./voiceEnabled";
 
 export const ELEVENLABS_AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID ?? "";
 
@@ -21,9 +22,28 @@ const VoiceSession = dynamic(() => import("./VoiceSession").then((m) => m.VoiceS
 
 /**
  * "Talk to Foggy": in-browser voice via ElevenLabs Conversational AI.
- * Without NEXT_PUBLIC_ELEVENLABS_AGENT_ID it shows a friendly not-configured state.
+ * With voice switched off (NEXT_PUBLIC_VOICE_ENABLED, see voiceEnabled.ts) it shows a paused
+ * state and VoiceSession is never rendered, so the voice SDK never loads. Without
+ * NEXT_PUBLIC_ELEVENLABS_AGENT_ID it shows a friendly not-configured state.
  */
 export function TalkToFoggy({ onTryText }: { onTryText?: () => void }) {
+  if (!VOICE_ENABLED) {
+    return (
+      <div className="flex flex-col items-center px-6 py-10 text-center">
+        <span className="grid size-20 place-items-center rounded-full bg-surface-pale text-brand-cyan-strong">
+          <CloudOff className="size-9" aria-hidden="true" />
+        </span>
+        <h3 className="mt-5 text-xl font-extrabold text-ink">Voice is paused for now</h3>
+        <p className="mt-2 max-w-sm text-ink-soft">You can still text Foggy.</p>
+        {onTryText ? (
+          <Button className="mt-6" onClick={onTryText}>
+            <MessageCircle className="size-5" aria-hidden="true" />
+            Try texting Foggy instead
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
   if (!ELEVENLABS_AGENT_ID) {
     return (
       <div className="flex flex-col items-center px-6 py-10 text-center">

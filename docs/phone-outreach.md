@@ -99,6 +99,7 @@ Practical consequence: for CloudCare's own texts and for calls through ElevenLab
 
 | Variable | Value |
 |---|---|
+| `OUTREACH_ENABLED` | `true` to allow texts and calls; default off (both buttons show "Calls and texts from Foggy are paused." and nothing reaches Twilio or ElevenLabs) |
 | `TWILIO_ACCOUNT_SID` | `AC...` |
 | `TWILIO_AUTH_TOKEN` | Auth Token (secret) |
 | `TWILIO_FROM_NUMBER` | the Twilio number, E.164 |

@@ -33,6 +33,7 @@ log = logging.getLogger("cloudcare.outreach")
 
 router = APIRouter(prefix="/outreach", tags=["outreach"])
 
+PAUSED = "Calls and texts from Foggy are paused."
 SMS_NOT_CONFIGURED = "Texting isn't set up on this server yet."
 CALL_NOT_CONFIGURED = "Phone calls aren't set up on this server yet."
 NO_PHONE = "Add your mobile number first."
@@ -111,10 +112,13 @@ def _abuse_checks(db: Session, patient: Patient, channel: str, to_number: str, s
 def capabilities(patient: Patient = Depends(get_current_patient)):
     settings = get_settings()
     reasons: dict[str, str] = {}
+    if not settings.enabled:
+        reasons["sms"] = PAUSED
+        reasons["call"] = PAUSED
     if not settings.sms_configured:
-        reasons["sms"] = SMS_NOT_CONFIGURED
+        reasons.setdefault("sms", SMS_NOT_CONFIGURED)
     if not settings.call_configured:
-        reasons["call"] = CALL_NOT_CONFIGURED
+        reasons.setdefault("call", CALL_NOT_CONFIGURED)
     usable = is_usable_e164(patient.phone)
     if not patient.phone:
         reasons.setdefault("phone", NO_PHONE)
@@ -153,6 +157,8 @@ def _plan_sections(db: Session, patient: Patient) -> list[str]:
 @router.post("/sms", response_model=SmsOut)
 def send_text(body: SmsIn, patient: Patient = Depends(get_current_patient), db: Session = Depends(get_db)):
     settings = get_settings()
+    if not settings.enabled:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, PAUSED)
     if not settings.sms_configured:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, SMS_NOT_CONFIGURED)
     to_number = _destination(patient, settings)
@@ -189,6 +195,8 @@ def send_text(body: SmsIn, patient: Patient = Depends(get_current_patient), db: 
 def text_status(provider_id: str, patient: Patient = Depends(get_current_patient), db: Session = Depends(get_db)):
     """Delivery status of one of the patient's own texts (from the last day)."""
     settings = get_settings()
+    if not settings.enabled:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, PAUSED)
     if not settings.sms_configured:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, SMS_NOT_CONFIGURED)
     if not _SID.match(provider_id) or outreach_log.find_message(db, patient.id, provider_id) is None:
@@ -207,6 +215,8 @@ def text_status(provider_id: str, patient: Patient = Depends(get_current_patient
 @router.post("/call", response_model=CallOut)
 def start_call(body: CallIn, patient: Patient = Depends(get_current_patient), db: Session = Depends(get_db)):
     settings = get_settings()
+    if not settings.enabled:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, PAUSED)
     if not settings.call_configured:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, CALL_NOT_CONFIGURED)
     if not local_tokens_enabled():

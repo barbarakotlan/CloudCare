@@ -4,6 +4,7 @@ import { AudioLines, CalendarCheck2, ClipboardCheck, Hospital } from "lucide-rea
 import { CloudShape } from "@/components/brand/CloudShape";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { VOICE_ENABLED } from "@/components/voice/voiceEnabled";
 import type { PatientOut } from "@/lib/api/types";
 import { daysSince, firstName, formatDate, greetingFor } from "@/lib/format";
 
@@ -62,10 +63,12 @@ export function GreetingBanner({
             <ClipboardCheck className="size-5" aria-hidden="true" />
             Check in now
           </a>
-          <Button variant="secondary" onClick={onTalk} aria-haspopup="dialog">
-            <AudioLines className="size-5" aria-hidden="true" />
-            Talk to Foggy
-          </Button>
+          {VOICE_ENABLED ? (
+            <Button variant="secondary" onClick={onTalk} aria-haspopup="dialog">
+              <AudioLines className="size-5" aria-hidden="true" />
+              Talk to Foggy
+            </Button>
+          ) : null}
         </div>
       </div>
 

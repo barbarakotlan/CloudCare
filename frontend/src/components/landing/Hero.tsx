@@ -4,6 +4,7 @@ import { CloudShape } from "@/components/brand/CloudShape";
 import { Swoosh } from "@/components/brand/Swoosh";
 import { SLOGAN_LEAD, SLOGAN_TAIL } from "@/components/brand/Wordmark";
 import { ScriptedConversation } from "@/components/phone/ScriptedConversation";
+import { VOICE_ENABLED } from "@/components/voice/voiceEnabled";
 import { DemoButton } from "./DemoProvider";
 
 export function Hero() {
@@ -44,10 +45,16 @@ export function Hero() {
           cover something.
         </p>
 
-        <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <DemoButton kind="chat" />
-          <DemoButton kind="voice" />
-        </div>
+        {VOICE_ENABLED ? (
+          <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <DemoButton kind="chat" />
+            <DemoButton kind="voice" />
+          </div>
+        ) : (
+          <div className="mt-8 flex justify-center">
+            <DemoButton kind="chat" />
+          </div>
+        )}
 
         <div className="relative mt-14 sm:mt-16">
           <FloatingNote

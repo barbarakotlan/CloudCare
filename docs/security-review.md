@@ -80,6 +80,7 @@ Backend (Render dashboard and `backend/.env`; documented in `backend/.env.exampl
 |---|---|
 | `JWT_SECRET` | HS256 signing key, at least 32 characters (`python -c "import secrets; print(secrets.token_urlsafe(48))"`). In production, missing/default/short turns CloudCare's own tokens off. Render: `generateValue: true`. |
 | `RENDER` / `ENV` / `APP_ENV` | Production detection. Render sets `RENDER` itself; set `ENV=production` on any other host. Also enables HSTS on API responses. |
+| `OUTREACH_ENABLED` | Master switch for texts and calls. **Default off**; only `1`, `true`, `on` or `yes` turn it on. Off: `/outreach/sms` and `/outreach/call` answer 503 "Calls and texts from Foggy are paused." before any provider request, and capabilities report both false. `render.yaml` sets `"false"`. |
 | `OUTREACH_DEMO_ALLOWLIST` | Who the shared demo accounts may text or call. **Unset or `*` (default) = any usable number** (demo day). A comma-separated list of numbers (any format, stored as E.164) restricts them to those numbers; `none` blocks them. Listed numbers also skip the cooldown and daily caps. In `render.yaml` as `sync: false`. |
 | `OUTREACH_NEW_NUMBER_COOLDOWN_SECONDS` | Wait after a number is set or changed before texts/calls. **Default 0 (off)** so a live demo can call any number an attendee types in; set 600 for a hardened deployment. |
 | `OUTREACH_MAX_PER_PATIENT_PER_DAY` | Texts and calls per patient per channel per 24 h (default 40). |

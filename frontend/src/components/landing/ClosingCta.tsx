@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CloudMark } from "@/components/brand/CloudMark";
 import { CloudShape } from "@/components/brand/CloudShape";
 import { Swoosh } from "@/components/brand/Swoosh";
+import { VOICE_ENABLED } from "@/components/voice/voiceEnabled";
 import { DemoButton } from "./DemoProvider";
 
 export function ClosingCta() {
@@ -15,10 +16,16 @@ export function ClosingCta() {
           Recovery happens at home. Foggy keeps it on plan.
         </h2>
         <Swoosh className="mx-auto mt-3 h-3 w-48 sm:h-4 sm:w-64" />
-        <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-          <DemoButton kind="chat" />
-          <DemoButton kind="voice" />
-        </div>
+        {VOICE_ENABLED ? (
+          <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+            <DemoButton kind="chat" />
+            <DemoButton kind="voice" />
+          </div>
+        ) : (
+          <div className="mt-8 flex justify-center">
+            <DemoButton kind="chat" />
+          </div>
+        )}
         <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-ink-soft">
           The demos use a sample care plan, so please don&rsquo;t enter real health information. Read how we handle your information in our{" "}
           <Link href="/privacy" className="font-bold text-brand-cyan-strong underline underline-offset-2">

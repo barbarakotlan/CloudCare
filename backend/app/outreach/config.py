@@ -1,8 +1,8 @@
 """Outreach settings (Twilio texts, ElevenLabs phone calls) and the shared HTTP client.
 
 Read from the environment at call time, so a missing value shows up as a clear
-"not configured" state on /outreach/* instead of a crash at import. Setup steps for
-each dashboard: docs/phone-outreach.md.
+"not configured" state on /outreach/* instead of a crash at import. Nothing is sent
+unless OUTREACH_ENABLED is on. Setup steps for each dashboard: docs/phone-outreach.md.
 """
 
 import os
@@ -36,6 +36,11 @@ def _env_flag(name: str, default: bool) -> bool:
     return value not in ("0", "false", "no", "off")
 
 
+def _env_on(name: str) -> bool:
+    """Strict opt-in: only "1", "true", "on" or "yes" turn it on; unset or anything else is off."""
+    return _env(name).lower() in ("1", "true", "on", "yes")
+
+
 def _env_int(name: str, default: int, lo: int, hi: int) -> int:
     try:
         value = int(_env(name))
@@ -64,6 +69,9 @@ class OutreachSettings:
     # demo_open=True (OUTREACH_DEMO_ALLOWLIST unset or "*") means any usable number.
     demo_allowlist: tuple[str, ...] = ()
     demo_open: bool = True
+    # Master switch (OUTREACH_ENABLED). Texts and calls are billed by Twilio and ElevenLabs, so
+    # they stay off unless deliberately switched on, even when every key above is set.
+    enabled: bool = False
 
     def demo_number_allowed(self, e164: str | None) -> bool:
         return bool(e164) and (self.demo_open or e164 in self.demo_allowlist)
@@ -96,11 +104,11 @@ class OutreachSettings:
 
     @property
     def sms_configured(self) -> bool:
-        return not self.sms_missing
+        return self.enabled and not self.sms_missing
 
     @property
     def call_configured(self) -> bool:
-        return not self.call_missing
+        return self.enabled and not self.call_missing
 
     def country_allowed(self, e164: str) -> bool:
         if not self.allowed_country_codes:
@@ -128,6 +136,7 @@ def get_settings() -> OutreachSettings:
                                       *RINGING_TIMEOUT_RANGE),
         demo_allowlist=_demo_allowlist(),
         demo_open=_demo_open(),
+        enabled=_env_on("OUTREACH_ENABLED"),
     )
 
 

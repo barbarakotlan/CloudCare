@@ -49,6 +49,8 @@ demo_data.hash_password = lambda password: _DEMO_HASH
 STRONG_SECRET = "s" * 48
 PHONE = "+15552345678"
 OUTREACH_ENV = {
+    # Texts and calls are off unless this master switch is on.
+    "OUTREACH_ENABLED": "true",
     "TWILIO_ACCOUNT_SID": "AC" + "a" * 32,
     "TWILIO_AUTH_TOKEN": "test-twilio-token",
     "TWILIO_FROM_NUMBER": "+15550001111",

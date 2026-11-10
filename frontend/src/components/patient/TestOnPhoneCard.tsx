@@ -15,6 +15,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Field, Input } from "@/components/ui/Input";
+import { VOICE_ENABLED } from "@/components/voice/voiceEnabled";
 import { ApiError, errorMessage } from "@/lib/api/client";
 import {
   callMe,
@@ -278,8 +279,12 @@ export function TestOnPhoneCard() {
             <span className="font-bold text-ink">Text me</span> sends a text with a link to your check-in.{" "}
           </>
         ) : null}
-        <span className="font-bold text-ink">Talk to Foggy</span> on this page uses your browser microphone, not your
-        phone.
+        {VOICE_ENABLED ? (
+          <>
+            <span className="font-bold text-ink">Talk to Foggy</span> on this page uses your browser microphone, not
+            your phone.
+          </>
+        ) : null}
       </p>
 
       {/* Number on file */}

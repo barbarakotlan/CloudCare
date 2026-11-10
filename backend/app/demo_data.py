@@ -6,7 +6,7 @@ Each patient tells one part of the story:
   Linda Park       gallbladder, general; post-op nausea & vomiting (PONV)      -> urgent (open)
   James Walker     knee scope, spinal; post-dural puncture headache            -> urgent (open)
   Harold Thompson  hip fracture, 81, general; family reports night confusion   -> possible delirium (acknowledged)
-  Wei Chen         hip replacement, spinal; asked something not in the plan    -> unanswered question (open)
+  Wei Chen         hip replacement, spinal; not in the plan, agreed to message  -> patient request (open)
   Aisha Brown      shoulder, general + nerve block; rebound pain, then well    -> resolved with notes
 
 Risk scores are computed by the real model (services/ml_service.score_risk), not hard-coded.
@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.auth import hash_password
 from app.models import CarePlan, CarePlanChunk, ChatMessage, Escalation, Patient, RiskScore, SymptomLog, User
 from app.routes.patients import split_into_chunks
+from app.services.foggy.phrase import OFFER, SENT
 from app.services.ml_service import score_risk
 
 DEMO_PASSWORD = "demo123"
@@ -32,8 +33,9 @@ DEMO_PASSWORD = "demo123"
 URGENT_REPLY = ("That could need prompt medical attention. Please call your care team now, or 911 if it feels "
                 "severe. I've also alerted your care team.")
 EMERGENCY_REPLY = "What you're describing can be an emergency. Please call 911 now. I've also alerted your care team."
-NOT_IN_PLAN_REPLY = ("I don't see that in your care plan, so I don't want to guess. I've sent your question to "
-                     "your care team, and they'll get back to you.")
+# Not in the plan: Foggy offers to message the care team and only sends after the patient agrees
+# (policy v2, same wording as services/foggy/phrase.py).
+CONSENT_YES = "Yes please."
 
 
 def _at(days_ago: float, hour: int = 9, minute: int = 0) -> datetime:
@@ -294,11 +296,13 @@ PATIENTS = [
         ],
         "chat": [
             (0.3, "patient", "Can I sleep on my side yet?"),
-            (0.3, "assistant", NOT_IN_PLAN_REPLY),
+            (0.3, "assistant", f"Your care plan doesn't cover sleeping on your side. {OFFER}"),
+            (0.3, "patient", CONSENT_YES),
+            (0.3, "assistant", SENT),
         ],
         "escalations": [
-            dict(trigger_type="unanswered_question", severity="low", status="open", chat_index=0, days_ago=0.3,
-                 summary='Not covered by care plan. Patient asked: "Can I sleep on my side yet?"'),
+            dict(trigger_type="patient_request", severity="low", status="open", chat_index=0, days_ago=0.3,
+                 summary="Can I sleep on my side yet?"),
         ],
     },
     {
@@ -322,13 +326,15 @@ PATIENTS = [
             (6, "assistant", "Your care plan says to wear your sling at all times for 4 weeks, including while "
                              "sleeping.", "Sling"),
             (5, "patient", "My fingers felt tingly last night."),
-            (5, "assistant", NOT_IN_PLAN_REPLY),
+            (5, "assistant", f"Your care plan doesn't answer that, and I can't diagnose problems. {OFFER}"),
+            (5, "patient", CONSENT_YES),
+            (5, "assistant", SENT),
             (4.8, "clinician", "Hi Aisha, this is Dr. Patel. Your sling strap was pressing on the nerves; loosening "
                                "it should fix the tingling. Message me if it comes back."),
         ],
         "escalations": [
-            dict(trigger_type="unanswered_question", severity="low", status="resolved", chat_index=4, days_ago=5,
-                 summary='Not covered by care plan. Patient said: "My fingers felt tingly last night."',
+            dict(trigger_type="patient_request", severity="low", status="resolved", chat_index=4, days_ago=5,
+                 summary="My fingers felt tingly last night.",
                  clinician_notes="Called patient. Sling strap was too tight; adjusted. Tingling resolved.",
                  resolved_days_ago=4.8),
         ],
@@ -400,10 +406,11 @@ def _create_patient(db: Session, spec: dict, clinician: User) -> None:
     _add_checkins(db, patient, spec["checkins"], escalate_high=True)
 
     messages = []
-    for days_ago, role, content, *cited in spec["chat"]:
+    for i, (days_ago, role, content, *cited) in enumerate(spec["chat"]):
         chunk = chunk_by_section.get(cited[0]) if cited else None
         m = ChatMessage(
-            patient_id=patient.id, role=role, content=content, created_at=_at(days_ago, 12),
+            # +i seconds: messages in the same turn share a time, and chat is sorted by created_at.
+            patient_id=patient.id, role=role, content=content, created_at=_at(days_ago, 12) + timedelta(seconds=i),
             citations=[{"chunk_id": str(chunk.id), "section": chunk.section}] if chunk else [],
             red_flag=role == "assistant" and content in (URGENT_REPLY, EMERGENCY_REPLY),
             answered_from_plan=(chunk is not None) if role == "assistant" else None,

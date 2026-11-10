@@ -257,6 +257,8 @@ export function TestOnPhoneCard() {
 
   // Texting is only offered when the server can really send texts; otherwise check-ins stay in the app.
   const showText = capabilities?.sms === true;
+  // Calling copy only appears when the server can really place calls right now.
+  const callOn = capabilities?.call === true;
   const smsBlocked = blockedReason("sms");
   const callBlocked = blockedReason("call");
 
@@ -266,13 +268,26 @@ export function TestOnPhoneCard() {
         id={`${ids}-title`}
         icon={<Smartphone className="size-5" aria-hidden="true" />}
         title="Test on my phone"
-        description={showText ? "Check in here, or have Foggy text or call you." : "Check in here, or have Foggy call you."}
+        description={
+          showText && callOn
+            ? "Check in here, or have Foggy text or call you."
+            : showText
+              ? "Check in here, or have Foggy text you."
+              : callOn
+                ? "Check in here, or have Foggy call you."
+                : "Check in here."
+        }
       />
 
       {/* What each option does, before asking for a number. */}
       <p className="mb-4 text-sm leading-relaxed text-ink-soft">
-        <span className="font-bold text-ink">Call me</span> places one automated call from Foggy, in a synthetic voice,
-        to this number using the same care plan. Calls aren&rsquo;t recorded; a transcript is kept for up to 30 days.{" "}
+        {callOn ? (
+          <>
+            <span className="font-bold text-ink">Call me</span> places one automated call from Foggy, in a synthetic
+            voice, to this number using the same care plan. Calls aren&rsquo;t recorded; a transcript is kept for up to
+            30 days.{" "}
+          </>
+        ) : null}
         <span className="font-bold text-ink">Check in here</span> uses this screen.{" "}
         {showText ? (
           <>
@@ -416,8 +431,14 @@ export function TestOnPhoneCard() {
       </div>
 
       <p className="mt-4 text-xs text-brand-gray">
-        {showText ? "Foggy only texts or calls the number on your account." : "Foggy only calls the number on your account."} Foggy can&rsquo;t place emergency calls: for chest pain
-        or trouble breathing, call 911.
+        {showText && callOn
+          ? "Foggy only texts or calls the number on your account. "
+          : showText
+            ? "Foggy only texts the number on your account. "
+            : callOn
+              ? "Foggy only calls the number on your account. "
+              : null}
+        Foggy can&rsquo;t place emergency calls: for chest pain or trouble breathing, call 911.
       </p>
     </Card>
   );
